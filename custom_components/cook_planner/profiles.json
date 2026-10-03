@@ -1,0 +1,191 @@
+{
+  "version": 1,
+  "_comment": "Starting-point profiles (degC). Times are for the stated reference weight at the base pit temperature, unwrapped unless noted. They are deliberately editable and will be re-fitted from the cook log. curve = planned probe temperature against fraction of cook time (0 = meat on, 1 = pull).",
+  "meats": {
+    "chicken": {
+      "name": "Chicken",
+      "cuts": {
+        "thigh": {
+          "name": "Thigh (bone-in, skin-on)",
+          "pit_c": 120,
+          "pit_band_c": [110, 135],
+          "finish_pit_c": 175,
+          "finish_after_min": 45,
+          "wrap": null,
+          "pull_c": 82,
+          "safe_min_c": 74,
+          "probe_2": null,
+          "rest_min": 5,
+          "hold_pit_c": null,
+          "time": {"ref_kg": 1.0, "ref_hours": 1.25, "weight_exponent": 0.15, "ref_thickness_cm": null},
+          "curve": [[0, 4], [0.6, 58], [1, 82]],
+          "stall_c": null,
+          "notes": "Thighs eat best at 80-85C as the collagen renders. Weight barely changes time: pieces cook in parallel."
+        },
+        "breast": {
+          "name": "Breast",
+          "pit_c": 120,
+          "pit_band_c": [110, 135],
+          "finish_pit_c": 160,
+          "finish_after_min": 40,
+          "wrap": null,
+          "pull_c": 72,
+          "carryover_check_c": 74,
+          "safe_min_c": 74,
+          "probe_2": null,
+          "rest_min": 10,
+          "hold_pit_c": null,
+          "time": {"ref_kg": 1.0, "ref_hours": 1.25, "weight_exponent": 0.15, "ref_thickness_cm": 3.5},
+          "curve": [[0, 4], [0.6, 52], [1, 72]],
+          "stall_c": null,
+          "notes": "Pull at 72C and rest; carryover must take it to 74C or more (food-safety guideline)."
+        },
+        "whole_butterflied": {
+          "name": "Whole, butterflied",
+          "pit_c": 165,
+          "pit_band_c": [150, 190],
+          "finish_pit_c": null,
+          "finish_after_min": null,
+          "wrap": null,
+          "pull_c": 72,
+          "carryover_check_c": 74,
+          "safe_min_c": 74,
+          "probe_1_role": "Breast",
+          "probe_2": {"role": "Thigh", "target_c": 80},
+          "rest_min": 15,
+          "hold_pit_c": null,
+          "time": {"ref_kg": 2.0, "ref_hours": 1.2, "weight_exponent": 0.67, "ref_thickness_cm": null},
+          "curve": [[0, 4], [0.55, 50], [1, 72]],
+          "stall_c": null,
+          "notes": "Probe 1 thickest breast (pull 72C), probe 2 thigh (80C+)."
+        },
+        "whole": {
+          "name": "Whole",
+          "pit_c": 165,
+          "pit_band_c": [150, 190],
+          "finish_pit_c": null,
+          "finish_after_min": null,
+          "wrap": null,
+          "pull_c": 72,
+          "carryover_check_c": 74,
+          "safe_min_c": 74,
+          "probe_1_role": "Breast",
+          "probe_2": {"role": "Thigh", "target_c": 80},
+          "rest_min": 20,
+          "hold_pit_c": null,
+          "time": {"ref_kg": 2.0, "ref_hours": 1.6, "weight_exponent": 0.67, "ref_thickness_cm": null},
+          "curve": [[0, 4], [0.55, 50], [1, 72]],
+          "stall_c": null,
+          "notes": "Probe 1 thickest breast (pull 72C), probe 2 thigh (80C+)."
+        }
+      }
+    },
+    "beef_brisket": {
+      "name": "Beef brisket",
+      "cuts": {
+        "point": {
+          "name": "Point end (deckle)",
+          "pit_c": 115,
+          "pit_band_c": [107, 135],
+          "finish_pit_c": 120,
+          "finish_after_min": null,
+          "wrap": {"default": "paper", "at_c": 71},
+          "pull_c": 95,
+          "safe_min_c": 63,
+          "probe_2": null,
+          "rest_min": 90,
+          "hold_pit_c": 68,
+          "time": {"ref_kg": 3.0, "ref_hours": 8.25, "weight_exponent": 0.67, "ref_thickness_cm": 8},
+          "curve": [[0, 4], [0.35, 65], [0.6, 73], [1, 95]],
+          "stall_c": [65, 75],
+          "notes": "Pull when probe-tender (probe slides in like butter), usually 93-98C."
+        },
+        "flat": {
+          "name": "Flat",
+          "pit_c": 115,
+          "pit_band_c": [107, 135],
+          "finish_pit_c": 120,
+          "finish_after_min": null,
+          "wrap": {"default": "paper", "at_c": 68},
+          "pull_c": 94,
+          "safe_min_c": 63,
+          "probe_2": null,
+          "rest_min": 60,
+          "hold_pit_c": 68,
+          "time": {"ref_kg": 2.5, "ref_hours": 5.6, "weight_exponent": 0.67, "ref_thickness_cm": 4},
+          "curve": [[0, 4], [0.35, 64], [0.6, 72], [1, 94]],
+          "stall_c": [64, 74],
+          "notes": "Leaner and thinner than the point: wrap a touch earlier to protect it from drying."
+        },
+        "whole": {
+          "name": "Whole (packer)",
+          "pit_c": 115,
+          "pit_band_c": [107, 135],
+          "finish_pit_c": 120,
+          "finish_after_min": null,
+          "wrap": {"default": "paper", "at_c": 71},
+          "pull_c": 95,
+          "safe_min_c": 63,
+          "probe_1_role": "Flat",
+          "probe_2": {"role": "Point", "target_c": 96},
+          "rest_min": 180,
+          "hold_pit_c": 68,
+          "time": {"ref_kg": 6.0, "ref_hours": 14.0, "weight_exponent": 0.67, "ref_thickness_cm": 8},
+          "curve": [[0, 4], [0.35, 65], [0.6, 73], [1, 95]],
+          "stall_c": [65, 75],
+          "notes": "Probe 1 in the thickest part of the flat (drives the plan), probe 2 in the point."
+        }
+      }
+    },
+    "pork_shoulder": {
+      "name": "Pork shoulder",
+      "cuts": {
+        "bone_in": {
+          "name": "Bone-in",
+          "pit_c": 115,
+          "pit_band_c": [107, 135],
+          "finish_pit_c": 120,
+          "finish_after_min": null,
+          "wrap": {"default": "none", "at_c": 72},
+          "pull_c": 95,
+          "safe_min_c": 63,
+          "probe_2": null,
+          "rest_min": 60,
+          "hold_pit_c": 68,
+          "time": {"ref_kg": 3.5, "ref_hours": 10.5, "weight_exponent": 0.67, "ref_thickness_cm": 12},
+          "curve": [[0, 4], [0.35, 65], [0.62, 74], [1, 95]],
+          "stall_c": [65, 76],
+          "notes": "Ready to pull at 93-96C when the blade bone wiggles free."
+        }
+      }
+    },
+    "lamb_shoulder": {
+      "name": "Lamb shoulder",
+      "cuts": {
+        "bone_in": {
+          "name": "Bone-in",
+          "pit_c": 125,
+          "pit_band_c": [115, 140],
+          "finish_pit_c": 135,
+          "finish_after_min": null,
+          "wrap": {"default": "foil", "at_c": 70},
+          "pull_c": 92,
+          "safe_min_c": 63,
+          "probe_2": null,
+          "rest_min": 30,
+          "hold_pit_c": 68,
+          "time": {"ref_kg": 2.0, "ref_hours": 5.5, "weight_exponent": 0.67, "ref_thickness_cm": 9},
+          "curve": [[0, 4], [0.35, 62], [0.6, 72], [1, 92]],
+          "stall_c": [62, 73],
+          "notes": "Wrap in foil with a splash of stock at ~70C; pulls apart at 90-93C."
+        }
+      }
+    }
+  },
+  "wrap_methods": {
+    "none": {"name": "No wrap", "post_wrap_time_factor": 1.0},
+    "paper": {"name": "Butcher paper", "post_wrap_time_factor": 0.85},
+    "foil": {"name": "Foil (Texas crutch)", "post_wrap_time_factor": 0.75}
+  },
+  "preheat_min": 20
+}

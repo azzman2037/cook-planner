@@ -1,0 +1,13 @@
+{
+  "domain": "cook_planner",
+  "name": "Cook Planner",
+  "codeowners": ["@azzman2037"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://github.com/azzman2037/cook-planner",
+  "integration_type": "helper",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/azzman2037/cook-planner/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

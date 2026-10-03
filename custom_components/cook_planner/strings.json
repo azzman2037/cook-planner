@@ -1,0 +1,127 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Cook Planner",
+        "description": "Pick the smoker's pit temperature and meat probes. Readings above 290°C are treated as an unplugged probe.",
+        "data": {
+          "pit_entity": "Pit temperature (climate or sensor)",
+          "probe_1_entity": "Probe 1 (drives the plan)",
+          "probe_2_entity": "Probe 2 (optional)"
+        }
+      }
+    },
+    "error": {
+      "same_probe": "Probe 2 must be a different sensor from probe 1."
+    },
+    "abort": {
+      "already_configured": "A planner already uses this probe."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Cook Planner entities",
+        "data": {
+          "pit_entity": "Pit temperature (climate or sensor)",
+          "probe_1_entity": "Probe 1 (drives the plan)",
+          "probe_2_entity": "Probe 2 (optional)"
+        }
+      }
+    },
+    "error": {
+      "same_probe": "Probe 2 must be a different sensor from probe 1."
+    }
+  },
+  "entity": {
+    "select": {
+      "meat": {
+        "name": "Meat"
+      },
+      "cut": {
+        "name": "Cut"
+      },
+      "wrap": {
+        "name": "Wrap"
+      }
+    },
+    "number": {
+      "weight": {
+        "name": "Weight"
+      },
+      "thickness": {
+        "name": "Thickness"
+      }
+    },
+    "datetime": {
+      "serve_by": {
+        "name": "Serve by"
+      }
+    },
+    "button": {
+      "generate_plan": {
+        "name": "Generate plan"
+      },
+      "start": {
+        "name": "Start cook"
+      },
+      "meat_on": {
+        "name": "Meat on"
+      },
+      "wrapped": {
+        "name": "Wrapped"
+      },
+      "pulled": {
+        "name": "Pulled"
+      },
+      "end": {
+        "name": "End cook"
+      }
+    },
+    "sensor": {
+      "stage": {
+        "name": "Stage",
+        "state": {
+          "idle": "Idle",
+          "planned": "Planned",
+          "preheat": "Preheating",
+          "cooking": "Cooking",
+          "rest": "Resting"
+        }
+      },
+      "plan": {
+        "name": "Plan"
+      },
+      "next_action": {
+        "name": "Next action"
+      },
+      "start_by": {
+        "name": "Start by"
+      },
+      "planned_pull": {
+        "name": "Planned pull"
+      },
+      "eta": {
+        "name": "ETA"
+      },
+      "schedule_delta": {
+        "name": "Behind schedule"
+      },
+      "progress": {
+        "name": "Progress"
+      },
+      "recommended_pit": {
+        "name": "Recommended pit"
+      },
+      "planned_probe": {
+        "name": "Planned probe"
+      },
+      "probe_rate": {
+        "name": "Probe rate"
+      },
+      "cook_log": {
+        "name": "Cook log"
+      }
+    }
+  }
+}

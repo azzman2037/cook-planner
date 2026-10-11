@@ -22,6 +22,23 @@
           "stall_c": null,
           "notes": "Thighs eat best at 80-85C as the collagen renders. Weight barely changes time: pieces cook in parallel."
         },
+        "thigh_fillet": {
+          "name": "Thigh fillet (boneless)",
+          "pit_c": 120,
+          "pit_band_c": [110, 135],
+          "finish_pit_c": 175,
+          "finish_after_min": 35,
+          "wrap": null,
+          "pull_c": 82,
+          "safe_min_c": 74,
+          "probe_2": null,
+          "rest_min": 5,
+          "hold_pit_c": null,
+          "time": {"ref_kg": 1.0, "ref_hours": 1.0, "weight_exponent": 0.15, "ref_thickness_cm": 2.0},
+          "curve": [[0, 4], [0.6, 60], [1, 82]],
+          "stall_c": null,
+          "notes": "Boneless fillets cook faster than bone-in thighs. Probe the thickest fillet; take it to 80-85C for tender, rendered meat (safe from 74C). Lay them flat so thickness is even."
+        },
         "breast": {
           "name": "Breast",
           "pit_c": 120,

@@ -214,10 +214,24 @@ class CookManager:
         """Build a plan from the current inputs."""
         if self.stage in (STAGE_PREHEAT, STAGE_COOKING, STAGE_REST):
             raise HomeAssistantError("A cook is in progress: end it before planning a new one")
+        self._roll_stale_serve_by()
         self._build_plan()
         self.stage = STAGE_PLANNED
         self._save()
         self._refresh()
+
+    def _roll_stale_serve_by(self) -> None:
+        """A serve time left over from a past cook moves to the same time today.
+
+        If that time has also passed it moves to tomorrow, so a forgotten date
+        never produces a plan that is days "late".
+        """
+        now = dt_util.now()
+        if self.serve_by > now:
+            return
+        local = dt_util.as_local(self.serve_by)
+        today = now.replace(hour=local.hour, minute=local.minute, second=0, microsecond=0)
+        self.serve_by = today if today > now else today + timedelta(days=1)
 
     def _build_plan(self) -> None:
         self.plan_inputs = {

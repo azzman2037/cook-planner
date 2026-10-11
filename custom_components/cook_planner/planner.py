@@ -39,6 +39,7 @@ BEHIND_ACTION_MIN = 20
 AHEAD_ACTION_MIN = 30
 PIT_NUDGE_C = 10
 ETA_RANGE = 0.15
+FLIP_WINDOW_MIN = 5
 
 
 class ProfileError(ValueError):
@@ -66,6 +67,7 @@ class CutProfile:
     pit_band_c: tuple[float, float]
     finish_pit_c: float | None
     finish_after_min: float | None
+    turn_after_min: float | None
     wrap_default: str
     wrap_at_c: float | None
     pull_c: float
@@ -151,6 +153,7 @@ def parse_profiles(raw: dict[str, Any]) -> Profiles:
                 pit_band_c=(band[0], band[1]),
                 finish_pit_c=_opt_float(c.get("finish_pit_c")),
                 finish_after_min=_opt_float(c.get("finish_after_min")),
+                turn_after_min=_opt_float(c.get("turn_after_min")),
                 wrap_default=(wrap or {}).get("default", "none"),
                 wrap_at_c=_opt_float((wrap or {}).get("at_c")),
                 pull_c=float(c["pull_c"]),
@@ -422,13 +425,34 @@ def _with_phases(plan: Plan, profiles: Profiles) -> Plan:
         change_reason = f"Probe {p.wrap_at_c:g}C"
 
     smoke_end = change_at or plan.pull_at
-    phases.append(
-        Phase(
-            "smoke", "Smoke", plan.meat_on, smoke_end, p.pit_c,
-            change_reason or f"Probe {p.pull_c:g}C",
-            f"Meat on, probe 1 in the {p.probe_1_role.lower()}",
-        )
+    turn_at = (
+        plan.meat_on + timedelta(minutes=p.turn_after_min)
+        if p.turn_after_min is not None
+        else None
     )
+    if turn_at is not None and turn_at < smoke_end:
+        phases.append(
+            Phase(
+                "smoke", "Cook side 1", plan.meat_on, turn_at, p.pit_c,
+                f"After {p.turn_after_min:g} min",
+                f"Meat on, probe 1 in the {p.probe_1_role.lower()}",
+            )
+        )
+        phases.append(
+            Phase(
+                "turn", "Flip & cook side 2", turn_at, smoke_end, p.pit_c,
+                change_reason or f"Probe {p.pull_c:g}C",
+                "Flip the pieces (re-seat the probe in the thickest one)",
+            )
+        )
+    else:
+        phases.append(
+            Phase(
+                "smoke", "Smoke", plan.meat_on, smoke_end, p.pit_c,
+                change_reason or f"Probe {p.pull_c:g}C",
+                f"Meat on, probe 1 in the {p.probe_1_role.lower()}",
+            )
+        )
     if change_at is not None and change_at < plan.pull_at:
         wrap_name = profiles.wrap_methods[plan.wrap].name
         if plan.wrap != "none":
@@ -558,6 +582,12 @@ def next_action(
             pit = finish.pit_c
     if probe_c >= p.pull_c:
         return f"Pull now ({probe_c:.0f}C) and rest {p.rest_min:g} min", p.hold_pit_c
+    if (
+        p.turn_after_min is not None
+        and elapsed_min is not None
+        and p.turn_after_min <= elapsed_min < p.turn_after_min + FLIP_WINDOW_MIN
+    ):
+        return f"Flip now ({elapsed_min:.0f} min in), probe {probe_c:.0f}C", pit
     if plan.wrap != "none" and not wrapped and p.wrap_at_c is not None and probe_c >= p.wrap_at_c:
         return f"Wrap now in {plan.wrap} (probe {probe_c:.0f}C)", pit
     if fc is not None and fc.delta_min >= BEHIND_ACTION_MIN and pit < high:

@@ -28,9 +28,10 @@ class WeightNumber(CookPlannerEntity, NumberEntity):
 
     _attr_device_class = NumberDeviceClass.WEIGHT
     _attr_native_unit_of_measurement = UnitOfMass.KILOGRAMS
-    _attr_native_min_value = 0.2
+    # Low enough for a single boneless thigh fillet (~100 g).
+    _attr_native_min_value = 0.05
     _attr_native_max_value = 15
-    _attr_native_step = 0.1
+    _attr_native_step = 0.05
     _attr_mode = NumberMode.BOX
 
     def __init__(self, manager: CookManager) -> None:

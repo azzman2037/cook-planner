@@ -29,7 +29,7 @@ ALL_CUTS = [(m, c) for m, cuts in PROFILES.cuts.items() for c in cuts]
 
 def test_profile_table_covers_requested_meats() -> None:
     assert set(PROFILES.cuts) == {"chicken", "beef_brisket", "pork_shoulder", "lamb_shoulder"}
-    assert set(PROFILES.cuts["chicken"]) == {"thigh", "breast", "whole_butterflied", "whole"}
+    assert set(PROFILES.cuts["chicken"]) == {"thigh", "thigh_fillet", "breast", "whole_butterflied", "whole"}
     assert set(PROFILES.cuts["beef_brisket"]) == {"point", "flat", "whole"}
 
 
@@ -174,6 +174,17 @@ def test_chicken_thigh_raises_pit_after_45_minutes() -> None:
     plan = build_plan(PROFILES, prof, weight_kg=1.5, serve_by=SERVE, now=NOW)
     _, before = next_action(plan, stage="cooking", probe_c=50, pit_c=120, wrapped=False, fc=None, elapsed_min=30)
     _, after = next_action(plan, stage="cooking", probe_c=60, pit_c=120, wrapped=False, fc=None, elapsed_min=50)
+    assert (before, after) == (120, 175)
+
+
+def test_thigh_fillet_is_quicker_than_bone_in_thigh() -> None:
+    bone_in = build_plan(PROFILES, PROFILES.cut("chicken", "thigh"), weight_kg=1.2, serve_by=SERVE, now=NOW)
+    fillet = build_plan(PROFILES, PROFILES.cut("chicken", "thigh_fillet"), weight_kg=1.2, serve_by=SERVE, now=NOW)
+    assert fillet.cook_hours < bone_in.cook_hours
+    assert fillet.profile.pull_c == 82
+    assert [ph.key for ph in fillet.phases] == ["preheat", "smoke", "finish", "rest"]
+    _, before = next_action(fillet, stage="cooking", probe_c=40, pit_c=120, wrapped=False, fc=None, elapsed_min=20)
+    _, after = next_action(fillet, stage="cooking", probe_c=60, pit_c=120, wrapped=False, fc=None, elapsed_min=40)
     assert (before, after) == (120, 175)
 
 

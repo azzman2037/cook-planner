@@ -148,6 +148,31 @@ async def test_cannot_plan_mid_cook(hass: HomeAssistant) -> None:
         )
 
 
+async def test_stale_serve_by_rolls_forward(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    tz = dt_util.get_time_zone("Australia/Sydney")
+    freezer.move_to(dt_util.as_utc(dt_util.now(tz).replace(year=2026, month=10, day=11, hour=16, minute=0)))
+    await _setup(hass)
+    stale = dt_util.now().replace(day=5, hour=18, minute=0)
+    await hass.services.async_call(
+        "datetime", "set_value", {"entity_id": "datetime.cook_planner_serve_by", "datetime": stale.isoformat()},
+        blocking=True,
+    )
+    await _press(hass, "generate_plan")
+    serve = dt_util.as_local(dt_util.parse_datetime(hass.states.get("datetime.cook_planner_serve_by").state))
+    assert (serve.day, serve.hour) == (11, 18)
+    assert "late" not in hass.states.get("sensor.cook_planner_next_action").state
+
+
+async def test_single_fillet_weight_is_accepted(hass: HomeAssistant) -> None:
+    await _setup(hass)
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": "number.cook_planner_weight", "value": 0.1}, blocking=True
+    )
+    assert float(hass.states.get("number.cook_planner_weight").state) == 0.1
+    await _press(hass, "generate_plan")
+    assert "0.1 kg" in hass.states.get("sensor.cook_planner_plan").state
+
+
 async def test_unload(hass: HomeAssistant) -> None:
     entry = await _setup(hass)
     assert await hass.config_entries.async_unload(entry.entry_id)

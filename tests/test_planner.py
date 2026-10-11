@@ -29,7 +29,9 @@ ALL_CUTS = [(m, c) for m, cuts in PROFILES.cuts.items() for c in cuts]
 
 def test_profile_table_covers_requested_meats() -> None:
     assert set(PROFILES.cuts) == {"chicken", "beef_brisket", "pork_shoulder", "lamb_shoulder"}
-    assert set(PROFILES.cuts["chicken"]) == {"thigh", "thigh_fillet", "breast", "whole_butterflied", "whole"}
+    assert set(PROFILES.cuts["chicken"]) == {
+        "thigh", "thigh_fillet", "thigh_fillet_quick", "breast", "whole_butterflied", "whole"
+    }
     assert set(PROFILES.cuts["beef_brisket"]) == {"point", "flat", "whole"}
 
 
@@ -186,6 +188,21 @@ def test_thigh_fillet_is_quicker_than_bone_in_thigh() -> None:
     _, before = next_action(fillet, stage="cooking", probe_c=40, pit_c=120, wrapped=False, fc=None, elapsed_min=20)
     _, after = next_action(fillet, stage="cooking", probe_c=60, pit_c=120, wrapped=False, fc=None, elapsed_min=40)
     assert (before, after) == (120, 175)
+
+
+def test_quick_thigh_fillet_is_hot_and_fast_with_a_flip() -> None:
+    prof = PROFILES.cut("chicken", "thigh_fillet_quick")
+    plan = build_plan(PROFILES, prof, weight_kg=1.36, serve_by=SERVE, now=NOW)
+    assert plan.cook_hours == pytest.approx(0.5)
+    assert [ph.key for ph in plan.phases] == ["preheat", "smoke", "turn", "rest"]
+    assert {ph.pit_c for ph in plan.phases if ph.key in ("smoke", "turn")} == {215}
+    early, _ = next_action(plan, stage="cooking", probe_c=40, pit_c=215, wrapped=False, fc=None, elapsed_min=10)
+    flip, pit = next_action(plan, stage="cooking", probe_c=55, pit_c=215, wrapped=False, fc=None, elapsed_min=16)
+    later, _ = next_action(plan, stage="cooking", probe_c=70, pit_c=215, wrapped=False, fc=None, elapsed_min=25)
+    assert not early.startswith("Flip")
+    assert flip.startswith("Flip now")
+    assert pit == 215
+    assert not later.startswith("Flip")
 
 
 def test_pull_advice_when_target_reached() -> None:

@@ -17,7 +17,7 @@ ignition) comes in v0.2.
 
 | Meat | Cuts |
 |---|---|
-| Chicken | Thigh, Breast, Whole (butterflied), Whole |
+| Chicken | Thigh (bone-in), Thigh fillet, Breast, Whole (butterflied), Whole |
 | Beef brisket | Point end (deckle), Flat, Whole (packer) |
 | Pork shoulder | Bone-in |
 | Lamb shoulder | Bone-in |

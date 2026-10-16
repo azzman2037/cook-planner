@@ -28,9 +28,12 @@ ALL_CUTS = [(m, c) for m, cuts in PROFILES.cuts.items() for c in cuts]
 
 
 def test_profile_table_covers_requested_meats() -> None:
-    assert set(PROFILES.cuts) == {"chicken", "beef_brisket", "pork_shoulder", "lamb_shoulder"}
+    assert set(PROFILES.cuts) == {
+        "chicken", "beef_brisket", "pork_shoulder", "lamb_shoulder", "sausages", "vegetables"
+    }
     assert set(PROFILES.cuts["chicken"]) == {
-        "thigh", "thigh_fillet", "thigh_fillet_quick", "breast", "whole_butterflied", "whole"
+        "thigh", "thigh_fillet", "thigh_fillet_quick", "breast", "whole_butterflied", "whole",
+        "spatchcock_recipe", "smoked_seared_thighs",
     }
     assert set(PROFILES.cuts["beef_brisket"]) == {"point", "flat", "whole"}
 
@@ -45,8 +48,9 @@ def test_every_cut_plans_backwards_from_serve_time(meat: str, cut: str) -> None:
     for a, b in zip(plan.phases, plan.phases[1:], strict=False):
         assert a.end == b.start
     assert plan.pull_at - plan.meat_on == timedelta(hours=plan.cook_hours)
-    # Planned curve ends at pull temp at the planned pull time.
-    assert plan.planned_temp_at(plan.pull_at) == pytest.approx(prof.pull_c)
+    # Planned curve ends at pull temp at the planned pull time (probe-driven cuts).
+    if prof.uses_probe and prof.pull_c is not None:
+        assert plan.planned_temp_at(plan.pull_at) == pytest.approx(prof.pull_c)
 
 
 @pytest.mark.parametrize(("meat", "cut"), ALL_CUTS)

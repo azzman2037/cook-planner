@@ -76,6 +76,9 @@
       },
       "end": {
         "name": "End cook"
+      },
+      "next_step": {
+        "name": "Next step"
       }
     },
     "sensor": {
@@ -121,6 +124,11 @@
       },
       "cook_log": {
         "name": "Cook log"
+      }
+    },
+    "switch": {
+      "auto_pit": {
+        "name": "Auto pit temperature"
       }
     }
   }

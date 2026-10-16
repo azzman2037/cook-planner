@@ -17,7 +17,12 @@
           "probe_2": null,
           "rest_min": 5,
           "hold_pit_c": null,
-          "time": {"ref_kg": 1.0, "ref_hours": 1.25, "weight_exponent": 0.15, "ref_thickness_cm": null},
+          "time": {
+            "ref_kg": 1.0,
+            "ref_hours": 1.25,
+            "weight_exponent": 0.15,
+            "ref_thickness_cm": null
+          },
           "curve": [[0, 4], [0.6, 58], [1, 82]],
           "stall_c": null,
           "notes": "Thighs eat best at 80-85C as the collagen renders. Weight barely changes time: pieces cook in parallel."
@@ -34,7 +39,12 @@
           "probe_2": null,
           "rest_min": 5,
           "hold_pit_c": null,
-          "time": {"ref_kg": 1.0, "ref_hours": 1.0, "weight_exponent": 0.05, "ref_thickness_cm": 2.0},
+          "time": {
+            "ref_kg": 1.0,
+            "ref_hours": 1.0,
+            "weight_exponent": 0.05,
+            "ref_thickness_cm": 2.0
+          },
           "curve": [[0, 4], [0.6, 60], [1, 82]],
           "stall_c": null,
           "notes": "Boneless fillets cook faster than bone-in thighs. Probe the thickest fillet; take it to 80-85C for tender, rendered meat (safe from 74C). Lay them flat so thickness is even."
@@ -52,7 +62,12 @@
           "probe_2": null,
           "rest_min": 5,
           "hold_pit_c": null,
-          "time": {"ref_kg": 1.36, "ref_hours": 0.5, "weight_exponent": 0.05, "ref_thickness_cm": 2.0},
+          "time": {
+            "ref_kg": 1.36,
+            "ref_hours": 0.5,
+            "weight_exponent": 0.05,
+            "ref_thickness_cm": 2.0
+          },
           "curve": [[0, 4], [0.5, 45], [1, 80]],
           "stall_c": null,
           "notes": "Weeknight hot-and-fast, after GMG's Everyday Dinner Chicken Thighs: 420F (215C), about 30 min, flip at 15, dark meat to 79-85C (175-185F), rest 5-10 min."
@@ -70,7 +85,12 @@
           "probe_2": null,
           "rest_min": 10,
           "hold_pit_c": null,
-          "time": {"ref_kg": 1.0, "ref_hours": 1.25, "weight_exponent": 0.15, "ref_thickness_cm": 3.5},
+          "time": {
+            "ref_kg": 1.0,
+            "ref_hours": 1.25,
+            "weight_exponent": 0.15,
+            "ref_thickness_cm": 3.5
+          },
           "curve": [[0, 4], [0.6, 52], [1, 72]],
           "stall_c": null,
           "notes": "Pull at 72C and rest; carryover must take it to 74C or more (food-safety guideline)."
@@ -86,10 +106,18 @@
           "carryover_check_c": 74,
           "safe_min_c": 74,
           "probe_1_role": "Breast",
-          "probe_2": {"role": "Thigh", "target_c": 80},
+          "probe_2": {
+            "role": "Thigh",
+            "target_c": 80
+          },
           "rest_min": 15,
           "hold_pit_c": null,
-          "time": {"ref_kg": 2.0, "ref_hours": 1.2, "weight_exponent": 0.67, "ref_thickness_cm": null},
+          "time": {
+            "ref_kg": 2.0,
+            "ref_hours": 1.2,
+            "weight_exponent": 0.67,
+            "ref_thickness_cm": null
+          },
           "curve": [[0, 4], [0.55, 50], [1, 72]],
           "stall_c": null,
           "notes": "Probe 1 thickest breast (pull 72C), probe 2 thigh (80C+)."
@@ -105,13 +133,129 @@
           "carryover_check_c": 74,
           "safe_min_c": 74,
           "probe_1_role": "Breast",
-          "probe_2": {"role": "Thigh", "target_c": 80},
+          "probe_2": {
+            "role": "Thigh",
+            "target_c": 80
+          },
           "rest_min": 20,
           "hold_pit_c": null,
-          "time": {"ref_kg": 2.0, "ref_hours": 1.6, "weight_exponent": 0.67, "ref_thickness_cm": null},
+          "time": {
+            "ref_kg": 2.0,
+            "ref_hours": 1.6,
+            "weight_exponent": 0.67,
+            "ref_thickness_cm": null
+          },
           "curve": [[0, 4], [0.55, 50], [1, 72]],
           "stall_c": null,
           "notes": "Probe 1 thickest breast (pull 72C), probe 2 thigh (80C+)."
+        },
+        "spatchcock_recipe": {
+          "name": "Spatchcock herb-butter · recipe",
+          "recipe": "1.1",
+          "pellets": "Apple, fruitwood or GMG Gold Blend",
+          "prep": "Cut out the backbone with poultry shears and flatten the breastbone. Pat dry. Rub: 20 g kosher salt, 10 g coarse pepper, 5 g garlic powder, 5 g smoked paprika; 40 g soft butter under the breast skin.",
+          "pull_c": 74,
+          "carryover_check_c": 75,
+          "safe_min_c": 74,
+          "probe_1_role": "Breast",
+          "probe_2": {
+            "role": "Thigh",
+            "target_c": 80
+          },
+          "rest_min": 12,
+          "rest_note": "Rest loosely tented with foil, then carve along the joints.",
+          "time": {
+            "ref_kg": 1.8,
+            "weight_exponent": 0.5
+          },
+          "notes": "Pull when the breast reads 74C and the thigh 80C (probe 2). Skin-side up the whole cook - never flip.",
+          "stages": [
+            {
+              "key": "smoke",
+              "name": "Smoke infusion",
+              "icon": "smoke",
+              "pit_c": 105,
+              "until": {
+                "probe_c": 48
+              },
+              "minutes": 50,
+              "enter": "Skin-side up on the centre grate. Probe 1 in the thickest breast, probe 2 in the thigh."
+            },
+            {
+              "key": "crisp",
+              "name": "Crisp & render",
+              "icon": "flame",
+              "pit_c": 190,
+              "until": {
+                "pull": true
+              },
+              "minutes": 40,
+              "enter": "Pit up to 190C to render the skin. Don't flip.",
+              "prompts": [
+                {
+                  "at_probe_c": 70,
+                  "text": "Brush lightly with melted butter or glaze."
+                }
+              ]
+            }
+          ]
+        },
+        "smoked_seared_thighs": {
+          "name": "Smoked & seared bone-in thighs · recipe",
+          "recipe": "1.2",
+          "pellets": "Hickory or fruitwood",
+          "prep": "Trim excess skin and fat pockets. Coat with 15 ml olive oil and 25 g poultry rub.",
+          "pull_c": 80,
+          "safe_min_c": 74,
+          "probe_1_role": "Thickest thigh, off the bone",
+          "rest_min": 6,
+          "rest_note": "Rest uncovered so the skin stays crisp.",
+          "time": {
+            "ref_kg": 1.0,
+            "weight_exponent": 0.1
+          },
+          "notes": "Pull at 80C (78-82C range). The guide's table and quick-reference disagree on when to flip; this follows the table: render flip at ~55C, glaze from 70C.",
+          "stages": [
+            {
+              "key": "smoke",
+              "name": "Smoke",
+              "icon": "smoke",
+              "pit_c": 110,
+              "until": {
+                "probe_c": 55
+              },
+              "minutes": 45,
+              "enter": "Skin-side up (bone-side down) on the grates, probe in the thickest thigh away from the bone."
+            },
+            {
+              "key": "render",
+              "name": "Flip & render",
+              "icon": "flip",
+              "pit_c": 175,
+              "until": {
+                "probe_c": 70
+              },
+              "minutes": 20,
+              "enter": "Flip skin-side DOWN to render the fat; pit up to 175C.",
+              "prompts": [
+                {
+                  "at_min": 10,
+                  "text": "Flip back skin-side up."
+                }
+              ]
+            },
+            {
+              "key": "glaze",
+              "name": "Glaze & set",
+              "icon": "glaze",
+              "pit_c": 175,
+              "until": {
+                "pull": true
+              },
+              "minutes": 10,
+              "enter": "Brush on the BBQ glaze and let it tack up."
+            }
+          ]
         }
       }
     },
@@ -124,13 +268,21 @@
           "pit_band_c": [107, 135],
           "finish_pit_c": 120,
           "finish_after_min": null,
-          "wrap": {"default": "paper", "at_c": 71},
+          "wrap": {
+            "default": "paper",
+            "at_c": 71
+          },
           "pull_c": 95,
           "safe_min_c": 63,
           "probe_2": null,
           "rest_min": 90,
           "hold_pit_c": 68,
-          "time": {"ref_kg": 3.0, "ref_hours": 8.25, "weight_exponent": 0.67, "ref_thickness_cm": 8},
+          "time": {
+            "ref_kg": 3.0,
+            "ref_hours": 8.25,
+            "weight_exponent": 0.67,
+            "ref_thickness_cm": 8
+          },
           "curve": [[0, 4], [0.35, 65], [0.6, 73], [1, 95]],
           "stall_c": [65, 75],
           "notes": "Pull when probe-tender (probe slides in like butter), usually 93-98C."
@@ -141,13 +293,21 @@
           "pit_band_c": [107, 135],
           "finish_pit_c": 120,
           "finish_after_min": null,
-          "wrap": {"default": "paper", "at_c": 68},
+          "wrap": {
+            "default": "paper",
+            "at_c": 68
+          },
           "pull_c": 94,
           "safe_min_c": 63,
           "probe_2": null,
           "rest_min": 60,
           "hold_pit_c": 68,
-          "time": {"ref_kg": 2.5, "ref_hours": 5.6, "weight_exponent": 0.67, "ref_thickness_cm": 4},
+          "time": {
+            "ref_kg": 2.5,
+            "ref_hours": 5.6,
+            "weight_exponent": 0.67,
+            "ref_thickness_cm": 4
+          },
           "curve": [[0, 4], [0.35, 64], [0.6, 72], [1, 94]],
           "stall_c": [64, 74],
           "notes": "Leaner and thinner than the point: wrap a touch earlier to protect it from drying."
@@ -158,14 +318,25 @@
           "pit_band_c": [107, 135],
           "finish_pit_c": 120,
           "finish_after_min": null,
-          "wrap": {"default": "paper", "at_c": 71},
+          "wrap": {
+            "default": "paper",
+            "at_c": 71
+          },
           "pull_c": 95,
           "safe_min_c": 63,
           "probe_1_role": "Flat",
-          "probe_2": {"role": "Point", "target_c": 96},
+          "probe_2": {
+            "role": "Point",
+            "target_c": 96
+          },
           "rest_min": 180,
           "hold_pit_c": 68,
-          "time": {"ref_kg": 6.0, "ref_hours": 14.0, "weight_exponent": 0.67, "ref_thickness_cm": 8},
+          "time": {
+            "ref_kg": 6.0,
+            "ref_hours": 14.0,
+            "weight_exponent": 0.67,
+            "ref_thickness_cm": 8
+          },
           "curve": [[0, 4], [0.35, 65], [0.6, 73], [1, 95]],
           "stall_c": [65, 75],
           "notes": "Probe 1 in the thickest part of the flat (drives the plan), probe 2 in the point."
@@ -173,54 +344,471 @@
       }
     },
     "pork_shoulder": {
-      "name": "Pork shoulder",
+      "name": "Pork",
       "cuts": {
         "bone_in": {
-          "name": "Bone-in",
+          "name": "Shoulder, bone-in",
           "pit_c": 115,
           "pit_band_c": [107, 135],
           "finish_pit_c": 120,
           "finish_after_min": null,
-          "wrap": {"default": "none", "at_c": 72},
+          "wrap": {
+            "default": "none",
+            "at_c": 72
+          },
           "pull_c": 95,
           "safe_min_c": 63,
           "probe_2": null,
           "rest_min": 60,
           "hold_pit_c": 68,
-          "time": {"ref_kg": 3.5, "ref_hours": 10.5, "weight_exponent": 0.67, "ref_thickness_cm": 12},
+          "time": {
+            "ref_kg": 3.5,
+            "ref_hours": 10.5,
+            "weight_exponent": 0.67,
+            "ref_thickness_cm": 12
+          },
           "curve": [[0, 4], [0.35, 65], [0.62, 74], [1, 95]],
           "stall_c": [65, 76],
           "notes": "Ready to pull at 93-96C when the blade bone wiggles free."
+        },
+        "pulled_pork_recipe": {
+          "name": "Pulled pork, Boston butt · recipe",
+          "recipe": "2.1",
+          "pellets": "GMG Texas Blend (hickory, oak, mesquite) or apple",
+          "prep": "Score the fat cap in a 5 mm crosshatch. 30 ml yellow mustard as binder, then 50 g sweet & savoury pork rub. Best for 2.5-3.5 kg.",
+          "pull_c": 95,
+          "safe_min_c": 63,
+          "probe_1_role": "Thickest part, off the bone",
+          "rest_min": 90,
+          "rest_note": "Wrap in an old towel and rest 1.5-2 h in an esky (keep it above 60C), then shred with the juices.",
+          "time": {
+            "ref_kg": 3.0,
+            "weight_exponent": 0.67
+          },
+          "stall_c": [65, 74],
+          "notes": "Pull at 95C or when the probe slides in with no resistance (95-98C).",
+          "stages": [
+            {
+              "key": "bark",
+              "name": "Bark formation",
+              "icon": "smoke",
+              "pit_c": 105,
+              "until": {
+                "probe_c": 72
+              },
+              "minutes": 300,
+              "enter": "Fat cap UP, probe in the thickest part away from the bone.",
+              "prompts": [
+                {
+                  "every_min": 45,
+                  "from_min": 120,
+                  "text": "Spritz with 50/50 apple juice and cider vinegar."
+                }
+              ]
+            },
+            {
+              "key": "wrap",
+              "name": "Wrap (crutch)",
+              "icon": "wrap",
+              "pit_c": 125,
+              "until": {
+                "probe_c": 93
+              },
+              "minutes": 180,
+              "enter": "Double-wrap tight in butcher paper or foil with 30 g brown sugar and 30 g butter, re-seat the probe. Pit up to 125C.",
+              "wrap": true
+            },
+            {
+              "key": "tender",
+              "name": "Probe-tender test",
+              "icon": "probe",
+              "pit_c": 125,
+              "until": {
+                "pull": true
+              },
+              "minutes": 30,
+              "enter": "Start probe-tender checks: it should slide in like warm butter."
+            }
+          ]
+        },
+        "spare_ribs_321": {
+          "name": "Spare ribs 3-2-1 · recipe",
+          "recipe": "2.2",
+          "probe": false,
+          "pellets": "Fruitwood or pecan",
+          "prep": "Peel the membrane off the back of the rack. Season both sides with 35 g pork rub.",
+          "rest_min": 10,
+          "rest_note": "Rest 10 min, then slice between the bones.",
+          "time": {
+            "ref_kg": 2.0,
+            "weight_exponent": 0
+          },
+          "notes": "Timed cook - no probe needed. Done when the rack bends ~90 degrees without breaking (about 93-95C if you do probe).",
+          "stages": [
+            {
+              "key": "smoke",
+              "name": "Smoke (3 h)",
+              "icon": "smoke",
+              "pit_c": 105,
+              "until": {
+                "minutes": 180
+              },
+              "minutes": 180,
+              "enter": "Bone-side down. Watch for the meat pulling back ~5 mm from the bone ends.",
+              "prompts": [
+                {
+                  "every_min": 45,
+                  "from_min": 60,
+                  "text": "Spritz the ribs."
+                }
+              ]
+            },
+            {
+              "key": "wrap",
+              "name": "Wrap (2 h)",
+              "icon": "wrap",
+              "pit_c": 115,
+              "until": {
+                "minutes": 105
+              },
+              "minutes": 105,
+              "enter": "Foil with 20 g butter, 15 ml honey, 15 ml apple juice; ribs meat-side DOWN; wrap tight. Pit to 115C.",
+              "wrap": true
+            },
+            {
+              "key": "glaze",
+              "name": "Glaze & set (1 h)",
+              "icon": "glaze",
+              "pit_c": 110,
+              "until": {
+                "minutes": 40
+              },
+              "minutes": 40,
+              "enter": "Unwrap, flip bone-side down and brush on the glaze. Pit to 110C.",
+              "prompts": [
+                {
+                  "at_min": 30,
+                  "text": "Bend test: the rack should bend ~90 degrees without snapping."
+                }
+              ]
+            }
+          ]
         }
       }
     },
     "lamb_shoulder": {
-      "name": "Lamb shoulder",
+      "name": "Lamb",
       "cuts": {
         "bone_in": {
-          "name": "Bone-in",
+          "name": "Shoulder, bone-in",
           "pit_c": 125,
           "pit_band_c": [115, 140],
           "finish_pit_c": 135,
           "finish_after_min": null,
-          "wrap": {"default": "foil", "at_c": 70},
+          "wrap": {
+            "default": "foil",
+            "at_c": 70
+          },
           "pull_c": 92,
           "safe_min_c": 63,
           "probe_2": null,
           "rest_min": 30,
           "hold_pit_c": 68,
-          "time": {"ref_kg": 2.0, "ref_hours": 5.5, "weight_exponent": 0.67, "ref_thickness_cm": 9},
+          "time": {
+            "ref_kg": 2.0,
+            "ref_hours": 5.5,
+            "weight_exponent": 0.67,
+            "ref_thickness_cm": 9
+          },
           "curve": [[0, 4], [0.35, 62], [0.6, 72], [1, 92]],
           "stall_c": [62, 73],
           "notes": "Wrap in foil with a splash of stock at ~70C; pulls apart at 90-93C."
+        },
+        "lamb_rack_reverse_sear": {
+          "name": "Rack, reverse-seared · recipe",
+          "recipe": "3.1",
+          "pellets": "Oak or pecan",
+          "prep": "Frenched rack (~800 g). Paste of 3 minced garlic cloves, 10 g chopped rosemary, 15 ml olive oil, 8 g sea salt, 5 g cracked pepper.",
+          "pull_c": 55,
+          "safe_min_c": 54,
+          "probe_1_role": "Centre of the eye",
+          "rest_min": 9,
+          "rest_note": "Rest 8-10 min (it climbs to 57-58C), then slice between the bones.",
+          "time": {
+            "ref_kg": 0.8,
+            "weight_exponent": 0.4
+          },
+          "notes": "Medium-rare: pull at 55C. The rack comes OFF while the grill climbs to sear heat, so carryover doesn't overshoot.",
+          "stages": [
+            {
+              "key": "smoke",
+              "name": "Gentle smoke",
+              "icon": "smoke",
+              "pit_c": 100,
+              "until": {
+                "probe_c": 48
+              },
+              "minutes": 50,
+              "enter": "Bone-side down, probe in the centre of the eye."
+            },
+            {
+              "key": "heat",
+              "name": "Heat for sear",
+              "icon": "flame",
+              "pit_c": 260,
+              "until": {
+                "pit_c": 245
+              },
+              "minutes": 15,
+              "enter": "Take the rack off and tent it with foil while the grill climbs to 260C.",
+              "scale": false
+            },
+            {
+              "key": "sear",
+              "name": "High-heat sear",
+              "icon": "sear",
+              "pit_c": 260,
+              "until": {
+                "pull": true
+              },
+              "minutes": 5,
+              "enter": "Rack back on: flip every 90 seconds to build an even crust.",
+              "scale": false
+            }
+          ]
+        },
+        "pulled_lamb_shoulder": {
+          "name": "8-hour pulled shoulder · recipe",
+          "recipe": "3.2",
+          "pellets": "GMG Texas Blend or hickory",
+          "prep": "Season hard with sea salt, ground cumin, coriander seed, garlic powder and dried oregano. Best for 1.8-2.5 kg.",
+          "pull_c": 95,
+          "safe_min_c": 63,
+          "probe_1_role": "Thickest part, off the bone",
+          "rest_min": 60,
+          "rest_note": "Rest 60 min in an esky or warm oven, then shred and toss through the reduced pan juices.",
+          "time": {
+            "ref_kg": 2.2,
+            "weight_exponent": 0.67
+          },
+          "stall_c": [62, 72],
+          "notes": "Pull at 94-96C when probe-tender.",
+          "stages": [
+            {
+              "key": "smoke",
+              "name": "Open smoke",
+              "icon": "smoke",
+              "pit_c": 110,
+              "until": {
+                "probe_c": 70
+              },
+              "minutes": 240,
+              "enter": "Fat side up.",
+              "prompts": [
+                {
+                  "every_min": 60,
+                  "from_min": 60,
+                  "text": "Spritz with 50/50 red wine vinegar and water."
+                }
+              ]
+            },
+            {
+              "key": "braise",
+              "name": "Pan braise",
+              "icon": "wrap",
+              "pit_c": 130,
+              "until": {
+                "pull": true
+              },
+              "minutes": 210,
+              "enter": "Into a foil tray with 150 ml beef stock and 2 rosemary sprigs, cover tightly. Pit up to 130C.",
+              "wrap": true
+            }
+          ]
+        }
+      }
+    },
+    "sausages": {
+      "name": "Sausages",
+      "cuts": {
+        "smoked_sausages": {
+          "name": "Slow-smoked snags & brats · recipe",
+          "recipe": "4.1",
+          "pellets": "Hickory, oak or fruitwood",
+          "prep": "Don't prick the casings. Brush lightly with olive oil.",
+          "pull_c": 74,
+          "safe_min_c": 72,
+          "probe_1_role": "Thickest sausage, end-on",
+          "rest_min": 5,
+          "rest_note": "Serve straight away.",
+          "time": {
+            "ref_kg": 0.8,
+            "weight_exponent": 0.05
+          },
+          "notes": "Pull at 74C, safe for pork (72C) and chicken sausages (74C). The snap-crisp heat goes on at 68C because the pit takes ~10 min to climb to 190C.",
+          "stages": [
+            {
+              "key": "smoke",
+              "name": "Low smoke",
+              "icon": "smoke",
+              "pit_c": 105,
+              "until": {
+                "probe_c": 58
+              },
+              "minutes": 45,
+              "enter": "2 cm apart on the upper rack, probe end-on into the thickest sausage."
+            },
+            {
+              "key": "flip",
+              "name": "Flip & colour",
+              "icon": "flip",
+              "pit_c": 120,
+              "until": {
+                "probe_c": 68
+              },
+              "minutes": 25,
+              "enter": "Flip the sausages 180 degrees for even colour. Pit to 120C."
+            },
+            {
+              "key": "crisp",
+              "name": "Snap crisp",
+              "icon": "flame",
+              "pit_c": 190,
+              "until": {
+                "pull": true
+              },
+              "minutes": 8,
+              "enter": "Pit to 190C to tighten the casings - pull the moment they hit 74C."
+            }
+          ]
+        }
+      }
+    },
+    "vegetables": {
+      "name": "Vegetables",
+      "cuts": {
+        "hasselback_potatoes": {
+          "name": "Hasselback potatoes · recipe",
+          "recipe": "5.1",
+          "pellets": "Oak or pecan",
+          "prep": "4 large Sebago or Russet potatoes (~250 g each), sliced every 3 mm stopping 5 mm from the base, garlic slivers in the cuts, 40 g melted butter and salt.",
+          "pull_c": 96,
+          "safe_min_c": 90,
+          "probe_1_role": "Centre of the largest potato",
+          "rest_min": 0,
+          "time": {
+            "ref_kg": 1.0,
+            "weight_exponent": 0.1
+          },
+          "notes": "Done at ~96C inside, when a skewer slides through with no resistance.",
+          "stages": [
+            {
+              "key": "smoke",
+              "name": "Smoke & open",
+              "icon": "smoke",
+              "pit_c": 120,
+              "until": {
+                "minutes": 45
+              },
+              "minutes": 45,
+              "enter": "Straight onto the grates, probe in the centre of the largest potato.",
+              "prompts": [
+                {
+                  "at_min": 30,
+                  "text": "Brush with the melted herb butter."
+                }
+              ]
+            },
+            {
+              "key": "crisp",
+              "name": "Crisp exterior",
+              "icon": "flame",
+              "pit_c": 185,
+              "until": {
+                "pull": true
+              },
+              "minutes": 40,
+              "enter": "Pit to 185C. Brush with bacon lard or clarified butter.",
+              "prompts": [
+                {
+                  "at_min": 30,
+                  "text": "Flaky salt and Parmesan on now (optional)."
+                }
+              ]
+            }
+          ]
+        },
+        "balsamic_veg": {
+          "name": "Balsamic veg medley · recipe",
+          "recipe": "5.2",
+          "probe": false,
+          "pellets": "Apple or pecan",
+          "prep": "500 g Kent pumpkin in 2 cm wedges, 2 zucchini in 2 cm rounds, 2 capsicums in 3 cm strips, 1 red onion in wedges. Toss with 30 ml olive oil, 5 g salt, 2 g pepper.",
+          "rest_min": 0,
+          "time": {
+            "ref_kg": 1.2,
+            "weight_exponent": 0
+          },
+          "notes": "Timed cook - no probe. The roast timer waits for the pit to reach 190C.",
+          "stages": [
+            {
+              "key": "smoke",
+              "name": "Smoke infusion",
+              "icon": "smoke",
+              "pit_c": 110,
+              "until": {
+                "minutes": 30
+              },
+              "minutes": 30,
+              "enter": "Single layer on a perforated tray or wire rack."
+            },
+            {
+              "key": "roast",
+              "name": "Roast & flip",
+              "icon": "flip",
+              "pit_c": 190,
+              "until": {
+                "minutes": 22
+              },
+              "minutes": 22,
+              "enter": "Pit to 190C - the roast timer starts once it's up to heat.",
+              "prompts": [
+                {
+                  "at_min": 12,
+                  "text": "Toss / flip the vegetables."
+                }
+              ],
+              "timer_from_pit": true
+            },
+            {
+              "key": "glaze",
+              "name": "Glaze finish",
+              "icon": "glaze",
+              "pit_c": 190,
+              "until": {
+                "minutes": 5
+              },
+              "minutes": 5,
+              "enter": "Drizzle 30 ml balsamic reduction over the vegetables."
+            }
+          ]
         }
       }
     }
   },
   "wrap_methods": {
-    "none": {"name": "No wrap", "post_wrap_time_factor": 1.0},
-    "paper": {"name": "Butcher paper", "post_wrap_time_factor": 0.85},
-    "foil": {"name": "Foil (Texas crutch)", "post_wrap_time_factor": 0.75}
+    "none": {
+      "name": "No wrap",
+      "post_wrap_time_factor": 1.0
+    },
+    "paper": {
+      "name": "Butcher paper",
+      "post_wrap_time_factor": 0.85
+    },
+    "foil": {
+      "name": "Foil (Texas crutch)",
+      "post_wrap_time_factor": 0.75
+    }
   },
   "preheat_min": 20
 }

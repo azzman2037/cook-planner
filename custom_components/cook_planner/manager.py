@@ -1,4 +1,5 @@
 """Runtime state for one Cook Planner entry: inputs, plan, live tracking, log."""
+
 from __future__ import annotations
 
 from collections import deque
@@ -20,8 +21,10 @@ from .const import (
     CONF_PROBE_1,
     CONF_PROBE_2,
     DOMAIN,
+    EVENT_PROMPT,
     LOG_KEEP,
     LOGGER,
+    NOTIFY_PREFIXES,
     RATE_MIN_SPAN_MIN,
     RATE_WINDOW_MIN,
     SAMPLE_KEEP_MIN,
@@ -33,7 +36,20 @@ from .const import (
     STORAGE_VERSION,
     UPDATE_INTERVAL_S,
 )
-from .planner import Forecast, Plan, Profiles, build_plan, forecast, load_profiles, next_action
+from .planner import (
+    Forecast,
+    Plan,
+    Profiles,
+    RecipeEvent,
+    RecipeRun,
+    build_plan,
+    forecast,
+    load_profiles,
+    next_action,
+    planned_pit,
+    recipe_forecast,
+    recipe_tick,
+)
 
 PROFILES_PATH = Path(__file__).parent / "profiles.json"
 # Readings outside this window are treated as "no probe" (e.g. an empty socket
@@ -102,7 +118,18 @@ class CookManager:
         self.rate_c_per_h: float | None = None
         self.forecast: Forecast | None = None
         self.advice: str = "Choose a meat, cut, weight and serve time, then Generate plan"
+        self.advice_title: str | None = None
+        self.advice_icon: str | None = None
+        self.step: int | None = None
+        self.steps: int | None = None
+        self.step_remaining_min: float | None = None
         self.recommended_pit_c: float | None = None
+        # Recipes and automation
+        self.run: RecipeRun | None = None
+        self.auto_pit: bool = True
+        self._last_auto_pit: float | None = None
+        self._last_notify_key: str | None = None
+        self._primed = False
 
     # ------------------------------------------------------------------ setup
 
@@ -118,9 +145,7 @@ class CookManager:
 
         tracked = [e for e in (self.pit_entity, self.probe_1_entity, self.probe_2_entity) if e]
         self._unsubs.append(async_track_state_change_event(self.hass, tracked, self._on_state))
-        self._unsubs.append(
-            async_track_time_interval(self.hass, self._on_tick, timedelta(seconds=UPDATE_INTERVAL_S))
-        )
+        self._unsubs.append(async_track_time_interval(self.hass, self._on_tick, timedelta(seconds=UPDATE_INTERVAL_S)))
         self._refresh()
 
     async def async_unload(self) -> None:
@@ -264,6 +289,7 @@ class CookManager:
             raise HomeAssistantError(f"Cannot start from stage {self.stage}")
         self.stage = STAGE_PREHEAT
         self.started_at = dt_util.now()
+        self._last_auto_pit = None
         self._save()
         self._refresh()
 
@@ -275,6 +301,7 @@ class CookManager:
         self.started_at = self.started_at or dt_util.now()
         self.meat_on = dt_util.now()
         self.stage = STAGE_COOKING
+        self.run = RecipeRun() if self.plan is not None and self.plan.profile.is_recipe else None
         self._samples.clear()
         self._save()
         self._refresh()
@@ -285,6 +312,22 @@ class CookManager:
         if self.stage != STAGE_COOKING:
             raise HomeAssistantError("Wrap only applies while cooking")
         self.wrapped_at = dt_util.now()
+        self._save()
+        self._refresh()
+
+    @callback
+    def next_step(self) -> None:
+        """Move a recipe on to its next step now (e.g. the bend test passed early)."""
+        if self.stage != STAGE_COOKING or self.run is None or self.plan is None:
+            raise HomeAssistantError("Next step only applies while cooking a recipe")
+        self._refresh(advance=True)
+        self._save()
+
+    @callback
+    def set_auto_pit(self, on: bool) -> None:
+        """Let the planner change the pit setpoint at each planned step."""
+        self.auto_pit = on
+        self._last_auto_pit = None
         self._save()
         self._refresh()
 
@@ -308,6 +351,7 @@ class CookManager:
         self.plan = None
         self.plan_inputs = None
         self.started_at = self.meat_on = self.wrapped_at = self.pulled_at = None
+        self.run = None
         self._samples.clear()
         self._save()
         self._refresh()
@@ -322,20 +366,20 @@ class CookManager:
             **(self.plan_inputs or {}),
             "planned_cook_h": round(self.plan.cook_hours, 2),
             "actual_cook_h": round(actual_h, 2),
-            "ratio_actual_to_plan": round(actual_h / self.plan.cook_hours, 3)
-            if self.plan.cook_hours
-            else None,
+            "ratio_actual_to_plan": round(actual_h / self.plan.cook_hours, 3) if self.plan.cook_hours else None,
             "meat_on": self.meat_on.isoformat(),
             "wrapped_at": self.wrapped_at.isoformat() if self.wrapped_at else None,
             "pulled_at": self.pulled_at.isoformat() if self.pulled_at else None,
             "pulled": self.pulled_at is not None,
             "final_probe_1_c": self.probe_1_c,
+            "recipe": self.plan.profile.recipe if self.plan.profile.is_recipe else None,
+            "step_reached": self.run.index + 1 if self.run else None,
         }
 
     # ---------------------------------------------------------------- refresh
 
     @callback
-    def _refresh(self) -> None:
+    def _refresh(self, advance: bool = False) -> None:
         now = dt_util.now()
         self.pit_c = _read_temp_c(self.hass, self.pit_entity)
         self.probe_1_c = self._probe(self.probe_1_entity)
@@ -345,13 +389,44 @@ class CookManager:
         self.forecast = None
         plan = self.plan
         elapsed = (now - self.meat_on).total_seconds() / 60 if self.meat_on else None
-        if plan is not None and self.stage == STAGE_COOKING and self.meat_on and self.probe_1_c is not None:
+        if (
+            plan is not None
+            and not plan.profile.is_recipe
+            and self.stage == STAGE_COOKING
+            and self.meat_on
+            and self.probe_1_c is not None
+        ):
             self.forecast = forecast(
                 plan, now=now, meat_on=self.meat_on, probe_c=self.probe_1_c, rate_c_per_h=self.rate_c_per_h
             )
+        self.advice_title = self.advice_icon = None
+        self.step = self.steps = self.step_remaining_min = None
+        events: list[RecipeEvent] = []
         if plan is None:
             self.advice = "Choose a meat, cut, weight and serve time, then Generate plan"
             self.recommended_pit_c = None
+        elif self.stage == STAGE_COOKING and self.run is not None and self.meat_on is not None:
+            was_index = self.run.index
+            status = recipe_tick(
+                plan,
+                self.run,
+                now=now,
+                probe_c=self.probe_1_c,
+                probe2_c=self.probe_2_c,
+                pit_c=self.pit_c,
+                advance=advance,
+            )
+            events.extend(status.events)
+            self.advice, self.recommended_pit_c = status.advice, status.pit_c
+            self.advice_title, self.advice_icon = status.title, status.icon
+            self.step, self.steps, self.step_remaining_min = status.step, status.steps, status.remaining_min
+            if plan.profile.stages[self.run.index].wrap and self.wrapped_at is None:
+                self.wrapped_at = now
+            self.forecast = recipe_forecast(
+                plan, self.run, now=now, meat_on=self.meat_on, probe_c=self.probe_1_c, rate_c_per_h=self.rate_c_per_h
+            )
+            if events or self.run.index != was_index:
+                self._save()
         else:
             self.advice, self.recommended_pit_c = next_action(
                 plan,
@@ -362,7 +437,56 @@ class CookManager:
                 fc=self.forecast,
                 elapsed_min=elapsed,
             )
+        self._notify_events(events)
+        if plan is not None:
+            self._apply_auto_pit(
+                planned_pit(plan, stage=self.stage, probe_c=self.probe_1_c, elapsed_min=elapsed, run=self.run)
+            )
         self._notify()
+
+    def _notify_events(self, events: list[RecipeEvent]) -> None:
+        """Fire cook_planner_prompt for recipe events and for legacy advice changes."""
+        for ev in events:
+            self.hass.bus.async_fire(
+                EVENT_PROMPT, {"key": ev.key, "kind": ev.kind, "title": ev.title, "message": ev.message}
+            )
+        recipe_cooking = self.run is not None and self.stage == STAGE_COOKING
+        key = self.advice[:8] if self.advice[:8] in NOTIFY_PREFIXES and not recipe_cooking else None
+        if self._primed and key and key != self._last_notify_key:
+            self.hass.bus.async_fire(
+                EVENT_PROMPT, {"key": key, "kind": "advice", "title": NOTIFY_PREFIXES[key], "message": self.advice}
+            )
+        self._last_notify_key = key
+        self._primed = True
+
+    def _apply_auto_pit(self, target: float | None) -> None:
+        """Set the grill to the planned pit temperature when the plan's step changes it.
+
+        Only acts on a change of plan target, so a manual tweak sticks until the
+        next step; never powers the grill on (ignition stays with the cook).
+        """
+        if not self.auto_pit or target is None or target == self._last_auto_pit:
+            return
+        if not self.pit_entity or not self.pit_entity.startswith("climate."):
+            return
+        state = self.hass.states.get(self.pit_entity)
+        if state is None or state.state != "heat":
+            return  # off, cooling down or offline: nothing to set yet
+        temp = target
+        if self.hass.config.units.temperature_unit != "°C":
+            temp = TemperatureConverter.convert(target, "°C", self.hass.config.units.temperature_unit)
+        self._last_auto_pit = target
+        self._save()
+        self.hass.async_create_task(self._async_set_pit(round(temp)))
+
+    async def _async_set_pit(self, temp: float) -> None:
+        try:
+            await self.hass.services.async_call(
+                "climate", "set_temperature", {"entity_id": self.pit_entity, "temperature": temp}, blocking=True
+            )
+        except HomeAssistantError as err:
+            self._last_auto_pit = None  # try again on the next refresh
+            LOGGER.warning("Could not set the pit to %s: %s", temp, err)
 
     def _probe(self, entity_id: str | None) -> float | None:
         value = _read_temp_c(self.hass, entity_id)
@@ -394,6 +518,7 @@ class CookManager:
                 "thickness_cm": self.thickness_cm,
                 "wrap": self.wrap,
                 "serve_by": self.serve_by.isoformat(),
+                "auto_pit": self.auto_pit,
             },
             "session": {
                 "stage": self.stage,
@@ -403,6 +528,8 @@ class CookManager:
                 "meat_on": iso(self.meat_on),
                 "wrapped_at": iso(self.wrapped_at),
                 "pulled_at": iso(self.pulled_at),
+                "recipe_run": self.run.as_dict() if self.run else None,
+                "auto_pit_last": self._last_auto_pit,
             },
             "log": self.log,
         }
@@ -426,6 +553,7 @@ class CookManager:
         if serve is not None:
             self.serve_by = serve
         self.log = list(data.get("log", []))
+        self.auto_pit = bool(inputs.get("auto_pit", True))
 
         session = data.get("session") or {}
         try:
@@ -436,6 +564,9 @@ class CookManager:
                 self.stage = session.get("stage", STAGE_PLANNED)
             for key in ("started_at", "meat_on", "wrapped_at", "pulled_at"):
                 setattr(self, key, dt_util.parse_datetime(session.get(key) or ""))
+            self._last_auto_pit = session.get("auto_pit_last")
+            if session.get("recipe_run") and self.plan is not None and self.plan.profile.is_recipe:
+                self.run = RecipeRun.from_dict(session["recipe_run"])
         except (KeyError, ValueError) as err:
             LOGGER.warning("Discarding unreadable saved cook session: %s", err)
             self.stage, self.plan, self.plan_inputs = STAGE_IDLE, None, None

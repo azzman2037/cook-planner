@@ -24,3 +24,13 @@ STAGE_PREHEAT: Final = "preheat"
 STAGE_COOKING: Final = "cooking"
 STAGE_REST: Final = "rest"
 STAGES: Final = [STAGE_IDLE, STAGE_PLANNED, STAGE_PREHEAT, STAGE_COOKING, STAGE_REST]
+
+EVENT_PROMPT: Final = "cook_planner_prompt"
+# Legacy (non-recipe) advice that warrants a phone notification, keyed by prefix.
+NOTIFY_PREFIXES: Final = {
+    "Pit is u": "Smoker up to temp",
+    "Flip now": "Flip it",
+    "Wrap now": "Time to wrap",
+    "Pull now": "Take it off",
+    "Resting:": "Check carryover",
+}

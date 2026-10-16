@@ -1,6 +1,8 @@
 """Select entities: meat, cut and wrap method."""
 from __future__ import annotations
 
+from typing import Any
+
 from homeassistant.components.select import SelectEntity
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
@@ -55,6 +57,25 @@ class CutSelect(CookPlannerEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         key = next(k for k, v in self.manager.cut_options().items() if v == option)
         self.manager.set_cut(key)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Per-cut details so a dashboard can badge recipes and show their prep."""
+        cuts = self.manager.profiles.cuts[self.manager.meat]
+        return {
+            "details": {
+                c.name: {
+                    "recipe": c.recipe if c.is_recipe else None,
+                    "pellets": c.pellets or None,
+                    "prep": c.prep or None,
+                    "uses_probe": c.uses_probe,
+                    "steps": len(c.stages) or None,
+                    "pit_c": c.pit_c,
+                    "pull_c": c.pull_c,
+                }
+                for c in cuts.values()
+            }
+        }
 
 
 class WrapSelect(CookPlannerEntity, SelectEntity):

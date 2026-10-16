@@ -42,7 +42,20 @@ def _plan_attrs(m: CookManager) -> Mapping[str, Any] | None:
     attrs["notes"] = m.plan.profile.notes
     attrs["meat_on_actual"] = m.meat_on.isoformat() if m.meat_on else None
     attrs["wrapped_at"] = m.wrapped_at.isoformat() if m.wrapped_at else None
+    # Index into ``phases`` of the step under way (recipes track it exactly).
+    attrs["phase_index"] = m.run.index + 1 if m.run is not None and m.stage == "cooking" else None
     return attrs
+
+
+def _advice_attrs(m: CookManager) -> Mapping[str, Any]:
+    return {
+        "title": m.advice_title,
+        "icon_key": m.advice_icon,
+        "step": m.step + 1 if m.step is not None else None,
+        "steps": m.steps,
+        "step_remaining_min": round(m.step_remaining_min) if m.step_remaining_min is not None else None,
+        "auto_pit": m.auto_pit,
+    }
 
 
 def _eta_attrs(m: CookManager) -> Mapping[str, Any] | None:
@@ -96,6 +109,7 @@ SENSORS: tuple[CookSensorDescription, ...] = (
         key="next_action",
         icon="mdi:chef-hat",
         value_fn=lambda m: m.advice[:255],
+        attrs_fn=_advice_attrs,
     ),
     CookSensorDescription(
         key="start_by",

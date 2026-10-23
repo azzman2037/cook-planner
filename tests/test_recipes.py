@@ -342,3 +342,27 @@ def test_live_rate_drives_the_time_left_and_the_advice() -> None:
     # Without a rate it falls back to the plan.
     st = recipe_tick(plan, run, now=later + timedelta(minutes=11), probe_c=30, probe2_c=None, pit_c=110)
     assert "at this rate" not in st.advice
+
+
+def test_probe_dropout_holds_the_step_instead_of_skipping_it() -> None:
+    # Real cook, 24 Oct 01:00: bark's planned time had long passed, the probe blinked out
+    # for one refresh, and the recipe jumped to "wrap" at 54C and raised the pit.
+    plan = _rolled("rolled_pulled", kg=2.65, cm=10)
+    c = Cook(plan)
+    c.tick(p1=5.6, pit=110)
+    st = c.tick(300, p1=None)  # 5 h in, well past the planned bark time
+    assert c.run.index == 0
+    assert st.pit_c == 110
+    assert not any(e.key.startswith("lost@") for e in c.events)  # a blink is not an alert
+    c.tick(5, p1=None)
+    c.tick(5, p1=None)  # 10 min without a reading
+    lost = [e for e in c.events if e.key.startswith("lost@")]
+    assert len(lost) == 1 and "Check it's plugged" in lost[0].message
+    c.tick(1, p1=None)
+    assert len([e for e in c.events if e.key.startswith("lost@")]) == 1  # alerted once per dropout
+    c.tick(1, p1=60)
+    assert c.run.probe_lost_at is None and c.run.index == 0
+    c.tick(1, p1=72.5)
+    assert c.run.index == 1  # the real temperature still moves it on
+    saved = RecipeRun.from_dict(json.loads(json.dumps(c.run.as_dict())))
+    assert saved.probe_lost_at is None

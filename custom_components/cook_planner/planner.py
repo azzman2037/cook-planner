@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import math
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -1037,6 +1038,32 @@ def _prompt_due(pr: RecipePrompt, clock: float, probe_c: float | None) -> int | 
     return int((clock - pr.from_min) // pr.every_min)
 
 
+def probe_minutes_to(
+    target_c: float, probe_c: float | None, pit_c: float | None, rate_c_per_h: float | None
+) -> float | None:
+    """Minutes for the probe to reach ``target_c``, projected from its measured rate of rise.
+
+    Newton's law of heating: the meat warms in proportion to how far it is below the
+    pit, so it slows as it gets close. The measured rate fixes the constant,
+    ``k = rate / (pit - probe)``, and ``t = ln((pit - probe) / (pit - target)) / k``.
+    An evaporative stall is not modelled, so near the stall this is a best case.
+    None when there is no usable rate or the target is too close to the pit.
+    """
+    if probe_c is None or pit_c is None or rate_c_per_h is None or rate_c_per_h < RATE_MIN_C_PER_H:
+        return None
+    if probe_c >= target_c:
+        return 0.0
+    if pit_c - target_c < 3 or pit_c <= probe_c:
+        return None
+    k = rate_c_per_h / (pit_c - probe_c)
+    return math.log((pit_c - probe_c) / (pit_c - target_c)) / k * 60
+
+
+def _span(minutes: float) -> str:
+    m = max(1, round(minutes))
+    return f"{m // 60} h {m % 60:02d} min" if m >= 60 else f"{m} min"
+
+
 def recipe_tick(
     plan: Plan,
     run: RecipeRun,
@@ -1046,10 +1073,13 @@ def recipe_tick(
     probe2_c: float | None,
     pit_c: float | None,
     advance: bool = False,
+    rate_c_per_h: float | None = None,
 ) -> RecipeStatus:
     """Advance a recipe run and report advice plus any new events.
 
-    ``advance`` forces the next stage (the cook pressed "Next step").
+    ``advance`` forces the next stage (the cook pressed "Next step"). With a
+    measured probe ``rate_c_per_h``, a probe-driven step's time left comes from the
+    live probe (see :func:`probe_minutes_to`) instead of the planned minutes.
     """
     p = plan.profile
     stages = p.stages
@@ -1105,6 +1135,12 @@ def recipe_tick(
         remaining = None
     else:
         remaining = max(0.0, planned - clock)
+    projected = None
+    if st.until in ("probe_c", "pull") and not run.ready:
+        target_c = st.until_value if st.until == "probe_c" else p.pull_c
+        projected = probe_minutes_to(target_c, probe_c, st.pit_c, rate_c_per_h)
+        if projected is not None:
+            remaining = projected
 
     if run.ready:
         if p.uses_probe and probe_c is not None and st.until == "pull":
@@ -1132,6 +1168,9 @@ def recipe_tick(
         target = st.until_value if st.until == "probe_c" else p.pull_c
         now_txt = f"{probe_c:.0f}C" if probe_c is not None else "no probe reading"
         advice = f"{st.name}: until probe {target:g}C (now {now_txt}), pit {st.pit_c:g}C"
+        if projected is not None and projected > 0:
+            stall = p.stall_c is not None and probe_c is not None and probe_c < p.stall_c[1] and target > p.stall_c[0]
+            advice += f", about {_span(projected)} at this rate" + (" plus any stall" if stall else "")
     title = f"Step {run.index + 1} of {last + 1} · {st.name}"
     return RecipeStatus(advice, title, st.icon, st.pit_c, run.index, last + 1, remaining, False, tuple(events))
 
@@ -1158,14 +1197,9 @@ def recipe_forecast(
     else:
         left = max(5.0, planned - clock)
         target = st.until_value if st.until == "probe_c" else p.pull_c
-        if (
-            st.until in ("probe_c", "pull")
-            and probe_c is not None
-            and rate_c_per_h is not None
-            and rate_c_per_h >= RATE_MIN_C_PER_H
-            and probe_c > 30
-        ):
-            left = (left + max(0.0, (target - probe_c) / rate_c_per_h * 60)) / 2
+        projected = probe_minutes_to(target, probe_c, st.pit_c, rate_c_per_h) if st.until != "pit_c" else None
+        if projected is not None:
+            left = max(1.0, projected)
     left += sum(plan.stage_minutes[run.index + 1 :])
     eta = now + timedelta(minutes=left)
     elapsed = max((now - meat_on).total_seconds() / 60, 0.0)

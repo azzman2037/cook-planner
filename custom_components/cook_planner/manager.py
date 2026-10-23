@@ -415,6 +415,7 @@ class CookManager:
                 probe2_c=self.probe_2_c,
                 pit_c=self.pit_c,
                 advance=advance,
+                rate_c_per_h=self.rate_c_per_h,
             )
             events.extend(status.events)
             self.advice, self.recommended_pit_c = status.advice, status.pit_c

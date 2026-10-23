@@ -58,6 +58,16 @@ weight and time, and a planned probe curve. The numbers are starting points;
 every finished cook is logged (`sensor.cook_planner_cook_log`) with planned vs
 actual hours so the profiles can be re-fitted from your own cooks.
 
+### Keep warm (v0.3)
+**Keep warm** holds the grill at the **Keep warm** temperature (65-95 °C, default
+70 °C; the GMG holds no lower than 65 °C) and keeps watching both probes. Pressed
+while cooking it pulls the meat and runs the rest in the smoker, with a "Rest done"
+alert at the end of the recipe's rest; pressed when idle it is a keep-warm session
+on its own (e.g. after End cook shut the grill down). The setpoint is sent only if
+the grill is already heating; ignition stays with the cook. Once the meat has been
+at 62 °C or more, a drop below 60 °C sends a "Meat cooling" alert (once per drop).
+End cook logs the time held in the smoker.
+
 ### Model
 * Cook time = `ref_hours × (weight / ref_kg) ^ weight_exponent` (exponent < 1:
   thickness, not mass, drives low-and-slow time). An optional thickness is
@@ -67,8 +77,8 @@ actual hours so the profiles can be re-fitted from your own cooks.
   once past the stall. Probe readings above 290 °C are treated as unplugged.
 
 ## Entities
-Inputs: `select` meat / cut / wrap, `number` weight / thickness, `datetime` serve by.
-Buttons: Generate plan, Start cook, Meat on, Wrapped, Pulled, End cook.
+Inputs: `select` meat / cut / wrap, `number` weight / thickness / keep warm, `datetime` serve by.
+Buttons: Generate plan, Start cook, Meat on, Wrapped, Next step, Pulled, Keep warm, End cook.
 Sensors: stage, plan (phases + planned curve in attributes), next action,
 start by, planned pull, ETA (with low/high), behind schedule, progress,
 recommended pit, planned probe, probe rate, cook log.

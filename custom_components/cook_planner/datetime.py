@@ -21,7 +21,7 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Set up the serve-by entity."""
-    async_add_entities([ServeByDateTime(entry.runtime_data)])
+    async_add_entities([ServeByDateTime(entry.runtime_data), KeepWarmUntilDateTime(entry.runtime_data)])
 
 
 class ServeByDateTime(CookPlannerEntity, DateTimeEntity):
@@ -38,3 +38,19 @@ class ServeByDateTime(CookPlannerEntity, DateTimeEntity):
 
     async def async_set_value(self, value: datetime) -> None:
         self.manager.set_input("serve_by", dt_util.as_local(value))
+
+
+class KeepWarmUntilDateTime(CookPlannerEntity, DateTimeEntity):
+    """When to stop keeping warm and shut down, with "Shut down at a set time"."""
+
+    _attr_icon = "mdi:timer-off-outline"
+
+    def __init__(self, manager: CookManager) -> None:
+        super().__init__(manager, "keep_warm_until")
+
+    @property
+    def native_value(self) -> datetime:
+        return self.manager.hold_until
+
+    async def async_set_value(self, value: datetime) -> None:
+        self.manager.set_input("hold_until", dt_util.as_local(value))

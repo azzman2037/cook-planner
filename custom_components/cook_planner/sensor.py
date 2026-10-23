@@ -20,6 +20,7 @@ from homeassistant.util import dt as dt_util
 
 from . import CookPlannerConfigEntry
 from .const import STAGES
+from .shutdown import STATES as SHUTDOWN_STATES
 from .entity import CookPlannerEntity
 from .manager import CookManager
 
@@ -59,6 +60,8 @@ def _advice_attrs(m: CookManager) -> Mapping[str, Any]:
         "hold_since": m.hold_since.isoformat() if m.hold_since else None,
         "pulled_at": m.pulled_at.isoformat() if m.pulled_at else None,
         "rest_ends": m.rest_ends.isoformat() if m.rest_ends and m.stage in ("rest", "hold") else None,
+        "after_keep_warm": m.after_hold,
+        "keep_warm_until": m.hold_until.isoformat(),
     }
 
 
@@ -89,6 +92,17 @@ def _planned_probe(m: CookManager) -> float | None:
     if m.plan is None or m.meat_on is None:
         return None
     return round(m.plan.planned_temp_at(dt_util.now(), m.meat_on), 1)
+
+
+def _shutdown_attrs(m: CookManager) -> Mapping[str, Any]:
+    w = m.shutdown
+    return {
+        "started": w.started.isoformat() if w.started else None,
+        "pit_at_start_c": w.pit_at_start,
+        "fan_seen_at": w.fan_seen_at.isoformat() if w.fan_seen_at else None,
+        "finished": w.finished.isoformat() if w.finished else None,
+        "history": w.history,
+    }
 
 
 def _log_attrs(m: CookManager) -> Mapping[str, Any]:
@@ -175,6 +189,14 @@ SENSORS: tuple[CookSensorDescription, ...] = (
         suggested_display_precision=1,
         icon="mdi:thermometer-chevron-up",
         value_fn=lambda m: m.rate_c_per_h,
+    ),
+    CookSensorDescription(
+        key="shutdown",
+        device_class=SensorDeviceClass.ENUM,
+        options=SHUTDOWN_STATES,
+        icon="mdi:fire-off",
+        value_fn=lambda m: m.shutdown.state,
+        attrs_fn=_shutdown_attrs,
     ),
     CookSensorDescription(
         key="cook_log",

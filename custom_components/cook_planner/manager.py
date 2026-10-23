@@ -17,6 +17,9 @@ from homeassistant.util import dt as dt_util
 from homeassistant.util.unit_conversion import TemperatureConverter
 
 from .const import (
+    AFTER_AT_TIME,
+    AFTER_HOLD_OPTIONS,
+    AFTER_REST_END,
     CONF_PIT_ENTITY,
     CONF_PROBE_1,
     CONF_PROBE_2,
@@ -25,6 +28,7 @@ from .const import (
     HOLD_REARM_C,
     HOLD_SAFE_C,
     KEEP_WARM_DEFAULT_C,
+    KEEP_WARM_MAX_H,
     KEEP_WARM_MAX_C,
     KEEP_WARM_MIN_C,
     LOG_KEEP,
@@ -56,6 +60,8 @@ from .planner import (
     recipe_forecast,
     recipe_tick,
 )
+
+from .shutdown import ShutdownWatch
 
 PROFILES_PATH = Path(__file__).parent / "profiles.json"
 # Readings outside this window are treated as "no probe" (e.g. an empty socket
@@ -109,6 +115,8 @@ class CookManager:
         self.wrap: str = ""
         self.serve_by: datetime = dt_util.now()
         self.keep_warm_c: float = KEEP_WARM_DEFAULT_C
+        self.after_hold: str = AFTER_REST_END
+        self.hold_until: datetime = dt_util.now() + timedelta(hours=1)
         # Session
         self.stage: str = STAGE_IDLE
         self.plan: Plan | None = None
@@ -123,6 +131,9 @@ class CookManager:
         # Meat warming up from cold in a stand-alone hold never arms it.
         self.hold_armed: bool = False
         self.hold_peak_c: float | None = None
+        self.shutdown = ShutdownWatch()
+        self._pending_shutdown: bool = False  # keep-warm has ended: shut down next
+        self._shutdown_scheduled: bool = False
         self.log: list[dict[str, Any]] = []
         # Derived each refresh
         self.probe_1_c: float | None = None
@@ -236,6 +247,8 @@ class CookManager:
             raise HomeAssistantError(f"Unknown wrap method {value}")
         if name == "keep_warm_c":
             value = min(max(float(value), KEEP_WARM_MIN_C), KEEP_WARM_MAX_C)
+        if name == "after_hold" and value not in AFTER_HOLD_OPTIONS:
+            raise HomeAssistantError(f"Unknown keep-warm ending {value}")
         setattr(self, name, value)
         self._input_changed()
 
@@ -376,9 +389,46 @@ class CookManager:
         self.rest_done = False
         self.hold_armed = False
         self.hold_peak_c = None
+        if self.hold_until <= now:
+            self.hold_until = now + timedelta(hours=1)
         self._last_auto_pit = None
         self._save()
         self._refresh()
+
+    @callback
+    def shut_down(self) -> None:
+        """End anything in progress (saving the cook) and power the grill off.
+
+        The grill firmware runs its own fan cool-down; the shutdown watch reports
+        whether it did. Power-off is only sent while the grill is heating.
+        """
+        if self.stage != STAGE_IDLE:
+            self.end()
+        if self._grill_heating() and self.pit_entity and self.pit_entity.startswith("climate."):
+            self.hass.async_create_task(self._async_power_off())
+
+    @callback
+    def _auto_shut_down(self) -> None:
+        self._pending_shutdown = self._shutdown_scheduled = False
+        if self.stage == STAGE_HOLD:
+            self.shut_down()
+
+    async def _async_power_off(self) -> None:
+        try:
+            await self.hass.services.async_call(
+                "climate", "turn_off", {"entity_id": self.pit_entity}, blocking=True
+            )
+        except HomeAssistantError as err:
+            LOGGER.warning("Could not power the grill off: %s", err)
+            self.hass.bus.async_fire(
+                EVENT_PROMPT,
+                {
+                    "key": f"shutdown_failed@{dt_util.now().isoformat()}",
+                    "kind": "prompt",
+                    "title": "Shutdown failed",
+                    "message": f"The grill did not take the power-off ({err}). Turn it off at the grill.",
+                },
+            )
 
     @property
     def rest_ends(self) -> datetime | None:
@@ -493,8 +543,13 @@ class CookManager:
                 fc=self.forecast,
                 elapsed_min=elapsed,
             )
+        events.extend(self._watch_shutdown(now))
         self._notify_events(events)
-        if self.stage == STAGE_HOLD:
+        if self._pending_shutdown:
+            if not self._shutdown_scheduled:
+                self._shutdown_scheduled = True
+                self.hass.loop.call_soon(self._auto_shut_down)
+        elif self.stage == STAGE_HOLD:
             # Asked for explicitly, so it applies whatever the auto-pit switch says.
             self._apply_auto_pit(self.keep_warm_c, force=True)
         elif plan is not None:
@@ -534,15 +589,45 @@ class CookManager:
             if left <= 0 and not self.rest_done:
                 self.rest_done = True
                 self._save()
+                stopping = self.after_hold == AFTER_REST_END
                 events.append(
                     RecipeEvent(
                         "rest_done",
                         "ready",
                         "Rest done",
-                        f"Ready to serve. Still holding at {kw:g}C"
-                        + (f", meat {coolest:.0f}C." if coolest is not None else "."),
+                        "Ready to serve"
+                        + (f", meat {coolest:.0f}C" if coolest is not None else "")
+                        + (". Shutting the grill down now." if stopping else f". Still holding at {kw:g}C."),
                     )
                 )
+                if stopping:
+                    self._pending_shutdown = True
+        if self.after_hold == AFTER_AT_TIME and now >= self.hold_until and not self._pending_shutdown:
+            self._pending_shutdown = True
+            events.append(
+                RecipeEvent(
+                    f"hold_until@{self.hold_until.isoformat()}",
+                    "ready",
+                    "Keep warm finished",
+                    f"Held until {dt_util.as_local(self.hold_until):%H:%M} as planned. Shutting the grill down now."
+                    + (f" Meat {coolest:.0f}C." if coolest is not None else ""),
+                )
+            )
+        if (
+            self.hold_since is not None
+            and now - self.hold_since >= timedelta(hours=KEEP_WARM_MAX_H)
+            and not self._pending_shutdown
+        ):
+            self._pending_shutdown = True
+            events.append(
+                RecipeEvent(
+                    f"hold_cap@{self.hold_since.isoformat()}",
+                    "prompt",
+                    "Keep warm limit reached",
+                    f"Kept warm for {KEEP_WARM_MAX_H} h, the most it holds. Shutting the grill down now."
+                    + (f" Meat {coolest:.0f}C." if coolest is not None else ""),
+                )
+            )
         if not self._grill_heating():
             self.advice = f"Grill is off: tap Ignite and it will hold {kw:g}C"
         elif ends is not None and now < ends:
@@ -552,11 +637,29 @@ class CookManager:
         else:
             held = (now - self.hold_since).total_seconds() / 60 if self.hold_since else 0
             self.advice = f"Keeping warm at {kw:g}C for {held:.0f} min"
+        if self.after_hold == AFTER_AT_TIME:
+            self.advice += f". Shuts down at {dt_util.as_local(self.hold_until):%H:%M}"
+        elif self.after_hold == AFTER_REST_END and ends is not None and now < ends:
+            self.advice += ", then shuts down"
         if coolest is not None and coolest < HOLD_SAFE_C:
             if (self.hold_peak_c or 0) >= HOLD_REARM_C:
                 self.advice = f"Meat at {coolest:.0f}C, below {HOLD_SAFE_C:g}C: serve now. " + self.advice
             else:
                 self.advice += f", meat {coolest:.0f}C and warming"
+
+    def _watch_shutdown(self, now: datetime) -> list[RecipeEvent]:
+        """Feed the pit climate's state to the shutdown watch."""
+        if not self.pit_entity or not self.pit_entity.startswith("climate."):
+            return []
+        state = self.hass.states.get(self.pit_entity)
+        mode = None if state is None or state.state in (STATE_UNKNOWN, STATE_UNAVAILABLE) else state.state
+        before = (self.shutdown.state, self.shutdown.was_heating)
+        events = self.shutdown.update(
+            now, mode=mode, action=state.attributes.get("hvac_action") if state else None, pit_c=self.pit_c
+        )
+        if (self.shutdown.state, self.shutdown.was_heating) != before:
+            self._save()
+        return events
 
     def _grill_heating(self) -> bool:
         if not self.pit_entity or not self.pit_entity.startswith("climate."):
@@ -641,6 +744,8 @@ class CookManager:
                 "serve_by": self.serve_by.isoformat(),
                 "auto_pit": self.auto_pit,
                 "keep_warm_c": self.keep_warm_c,
+                "after_hold": self.after_hold,
+                "hold_until": self.hold_until.isoformat(),
             },
             "session": {
                 "stage": self.stage,
@@ -654,6 +759,7 @@ class CookManager:
                 "rest_done": self.rest_done,
                 "hold_armed": self.hold_armed,
                 "hold_peak_c": self.hold_peak_c,
+                "shutdown": self.shutdown.as_dict(),
                 "recipe_run": self.run.as_dict() if self.run else None,
                 "auto_pit_last": self._last_auto_pit,
             },
@@ -681,8 +787,17 @@ class CookManager:
         self.log = list(data.get("log", []))
         self.auto_pit = bool(inputs.get("auto_pit", True))
         self.keep_warm_c = float(inputs.get("keep_warm_c") or KEEP_WARM_DEFAULT_C)
+        if inputs.get("after_hold") in AFTER_HOLD_OPTIONS:
+            self.after_hold = inputs["after_hold"]
+        until = dt_util.parse_datetime(inputs.get("hold_until") or "")
+        if until is not None:
+            self.hold_until = until
 
         session = data.get("session") or {}
+        try:
+            self.shutdown = ShutdownWatch.from_dict(session.get("shutdown") or {})
+        except (TypeError, ValueError) as err:
+            LOGGER.warning("Discarding unreadable shutdown watch: %s", err)
         try:
             if session.get("plan_inputs"):
                 created = dt_util.parse_datetime(session.get("plan_created") or "") or dt_util.now()

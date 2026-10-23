@@ -8,6 +8,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import CookPlannerConfigEntry
+from .const import AFTER_HOLD_OPTIONS
 from .entity import CookPlannerEntity
 
 PARALLEL_UPDATES = 0
@@ -20,7 +21,9 @@ async def async_setup_entry(
 ) -> None:
     """Set up selects."""
     m = entry.runtime_data
-    async_add_entities([MeatSelect(m, "meat"), CutSelect(m, "cut"), WrapSelect(m, "wrap")])
+    async_add_entities(
+        [MeatSelect(m, "meat"), CutSelect(m, "cut"), WrapSelect(m, "wrap"), AfterHoldSelect(m, "after_keep_warm")]
+    )
 
 
 class MeatSelect(CookPlannerEntity, SelectEntity):
@@ -95,3 +98,21 @@ class WrapSelect(CookPlannerEntity, SelectEntity):
     async def async_select_option(self, option: str) -> None:
         key = next(k for k, w in self.manager.profiles.wrap_methods.items() if w.name == option)
         self.manager.set_input("wrap", key)
+
+
+class AfterHoldSelect(CookPlannerEntity, SelectEntity):
+    """What happens when keeping warm ends; every ending shuts down with the fan cool-down."""
+
+    _attr_icon = "mdi:fire-off"
+
+    @property
+    def options(self) -> list[str]:
+        return list(AFTER_HOLD_OPTIONS.values())
+
+    @property
+    def current_option(self) -> str | None:
+        return AFTER_HOLD_OPTIONS.get(self.manager.after_hold)
+
+    async def async_select_option(self, option: str) -> None:
+        key = next(k for k, v in AFTER_HOLD_OPTIONS.items() if v == option)
+        self.manager.set_input("after_hold", key)

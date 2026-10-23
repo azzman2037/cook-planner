@@ -34,6 +34,16 @@ KEEP_WARM_MAX_C: Final = 95.0
 # Hot-holding: meat below 60C gets an alert, re-armed once it is back to 62C.
 HOLD_SAFE_C: Final = 60.0
 HOLD_REARM_C: Final = 62.0
+# What happens when keeping warm ends. A keep-warm never runs longer than the cap.
+AFTER_REST_END: Final = "rest_end"
+AFTER_AT_TIME: Final = "at_time"
+AFTER_SERVE: Final = "serve"
+AFTER_HOLD_OPTIONS: Final = {
+    AFTER_REST_END: "Shut down when the rest ends",
+    AFTER_AT_TIME: "Shut down at a set time",
+    AFTER_SERVE: "Keep holding until I serve",
+}
+KEEP_WARM_MAX_H: Final = 4
 
 EVENT_PROMPT: Final = "cook_planner_prompt"
 # Legacy (non-recipe) advice that warrants a phone notification, keyed by prefix.

@@ -43,6 +43,9 @@
       },
       "wrap": {
         "name": "Wrap"
+      },
+      "after_keep_warm": {
+        "name": "After keep warm"
       }
     },
     "number": {
@@ -59,6 +62,9 @@
     "datetime": {
       "serve_by": {
         "name": "Serve by"
+      },
+      "keep_warm_until": {
+        "name": "Keep warm until"
       }
     },
     "button": {
@@ -85,6 +91,9 @@
       },
       "keep_warm": {
         "name": "Keep warm"
+      },
+      "shut_down": {
+        "name": "Shut down"
       }
     },
     "sensor": {
@@ -131,6 +140,16 @@
       },
       "cook_log": {
         "name": "Cook log"
+      },
+      "shutdown": {
+        "name": "Shutdown",
+        "state": {
+          "idle": "Idle",
+          "stopping": "Stopping",
+          "cooling": "Fan cool-down",
+          "complete": "Complete",
+          "incomplete": "No cool-down"
+        }
       }
     },
     "switch": {

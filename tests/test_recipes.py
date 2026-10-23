@@ -17,6 +17,7 @@ from custom_components.cook_planner.planner import (
     load_profiles,
     parse_profiles,
     planned_pit,
+    probe_minutes_to,
     recipe_forecast,
     recipe_tick,
 )
@@ -312,3 +313,32 @@ def test_bad_recipes_are_rejected(mutate, match: str) -> None:
     raw["meats"]["chicken"]["cuts"]["spatchcock_recipe"] = recipe
     with pytest.raises(ProfileError, match=match):
         parse_profiles(raw)
+
+
+def test_probe_projection_follows_newtons_law() -> None:
+    # Real cook, 23 Oct: 2.65 kg roll at a 110C pit, probe 28.9C rising 12.8C/h.
+    m = probe_minutes_to(72, 28.9, 110, 12.8)
+    assert 4.5 * 60 < m < 5.1 * 60  # slower than the straight-line 3.4 h
+    assert probe_minutes_to(72, 28.9, 110, 25.6) == pytest.approx(m / 2)
+    assert probe_minutes_to(72, 80, 110, 12.8) == 0
+    assert probe_minutes_to(72, 28.9, 110, 0.5) is None  # no usable rate
+    assert probe_minutes_to(108, 28.9, 110, 12.8) is None  # target too close to the pit
+    assert probe_minutes_to(72, None, 110, 12.8) is None
+
+
+def test_live_rate_drives_the_time_left_and_the_advice() -> None:
+    plan = _rolled("rolled_pulled", kg=2.65, cm=10)
+    run = RecipeRun()
+    recipe_tick(plan, run, now=T0, probe_c=5.6, probe2_c=None, pit_c=110)
+    later = T0 + timedelta(minutes=125)
+    st = recipe_tick(plan, run, now=later, probe_c=28.9, probe2_c=None, pit_c=110, rate_c_per_h=12.8)
+    assert st.remaining_min == pytest.approx(probe_minutes_to(72, 28.9, 110, 12.8))
+    t2 = later + timedelta(minutes=10)
+    st = recipe_tick(plan, run, now=t2, probe_c=30, probe2_c=None, pit_c=110, rate_c_per_h=12.8)
+    assert "until probe 72C (now 30C)" in st.advice
+    assert "at this rate plus any stall" in st.advice
+    fc = recipe_forecast(plan, run, now=later, meat_on=T0, probe_c=28.9, rate_c_per_h=12.8)
+    assert fc.eta > later + timedelta(minutes=probe_minutes_to(72, 28.9, 110, 12.8))
+    # Without a rate it falls back to the plan.
+    st = recipe_tick(plan, run, now=later + timedelta(minutes=11), probe_c=30, probe2_c=None, pit_c=110)
+    assert "at this rate" not in st.advice

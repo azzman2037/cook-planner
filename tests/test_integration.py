@@ -294,3 +294,105 @@ async def test_next_step_outside_a_recipe_is_refused(hass: HomeAssistant) -> Non
     await _setup(hass)
     with pytest.raises(Exception, match="recipe"):
         await hass.services.async_call("button", "press", {"entity_id": "button.cook_planner_next_step"}, blocking=True)
+
+
+async def test_keep_warm_after_a_cook_rests_in_the_smoker(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    tz = dt_util.get_time_zone("Australia/Sydney")
+    freezer.move_to(dt_util.as_utc(dt_util.now(tz).replace(year=2026, month=10, day=17, hour=15, minute=0)))
+    await _setup(hass)
+    events = async_capture_events(hass, "cook_planner_prompt")
+    pit_calls = hass.data["pit_calls"]
+    await _select(hass, "Chicken", "Spatchcock herb-butter · recipe")
+    await _press(hass, "generate_plan")
+    await _press(hass, "start_cook")
+    await _press(hass, "meat_on")
+    freezer.tick(timedelta(minutes=60))
+    _set(hass, 75, p2=81, pit=190)
+    await hass.async_block_till_done()
+
+    await _press(hass, "keep_warm")
+    assert hass.states.get("sensor.cook_planner_stage").state == "hold"
+    assert pit_calls[-1].data["temperature"] == 70
+    advice = hass.states.get("sensor.cook_planner_next_action")
+    assert advice.state.startswith("Resting in the smoker at 70C, 12 min to go")
+    assert advice.attributes["keep_warm_c"] == 70
+    assert advice.attributes["rest_ends"] is not None
+    assert advice.attributes["step_remaining_min"] == 12
+
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": "number.cook_planner_keep_warm", "value": 80}, blocking=True
+    )
+    await hass.async_block_till_done()
+    assert pit_calls[-1].data["temperature"] == 80
+
+    freezer.tick(timedelta(minutes=13))
+    _set(hass, 72, p2=74, pit=80)
+    await hass.async_block_till_done()
+    _set(hass, 71, p2=74, pit=80)
+    await hass.async_block_till_done()
+    assert [e.data["title"] for e in events].count("Rest done") == 1
+    assert hass.states.get("sensor.cook_planner_next_action").state == "Rest done: ready to serve. Holding 80C"
+
+    # Meat cooling: one alert per drop, re-armed once it is back above 62C.
+    _set(hass, 59, p2=74, pit=80)
+    await hass.async_block_till_done()
+    _set(hass, 58, p2=74, pit=80)
+    await hass.async_block_till_done()
+    assert [e.data["title"] for e in events].count("Meat cooling") == 1
+    assert hass.states.get("sensor.cook_planner_next_action").state.startswith("Meat at 58C, below 60C: serve now")
+    _set(hass, 63, p2=74, pit=80)
+    await hass.async_block_till_done()
+    _set(hass, 59, p2=74, pit=80)
+    await hass.async_block_till_done()
+    assert [e.data["title"] for e in events].count("Meat cooling") == 2
+
+    await _press(hass, "end_cook")
+    assert hass.states.get("sensor.cook_planner_stage").state == "idle"
+    cook = hass.states.get("sensor.cook_planner_cook_log").attributes["cooks"][-1]
+    assert cook["pulled"] is True
+    assert cook["held_in_smoker_min"] == 13
+    assert cook["keep_warm_c"] == 80
+
+
+async def test_keep_warm_on_its_own_waits_for_ignition(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    await _setup(hass)
+    pit_calls = hass.data["pit_calls"]
+    hass.states.async_set(PIT, "off", {"current_temperature": 105, "temperature": 115})
+    await hass.async_block_till_done()
+    with pytest.raises(Exception, match="outside valid range 65"):  # the GMG holds no lower than 65C
+        await hass.services.async_call(
+            "number", "set_value", {"entity_id": "number.cook_planner_keep_warm", "value": 60}, blocking=True
+        )
+    assert hass.states.get("number.cook_planner_keep_warm").state == "70.0"
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": "number.cook_planner_keep_warm", "value": 65}, blocking=True
+    )
+    await _press(hass, "keep_warm")
+    assert hass.states.get("sensor.cook_planner_stage").state == "hold"
+    advice = hass.states.get("sensor.cook_planner_next_action").state
+    assert advice == "Grill is off: tap Ignite and it will hold 65C, meat 5C and warming"
+    assert pit_calls == []  # never ignites
+
+    hass.states.async_set(PIT, "heat", {"current_temperature": 90, "temperature": 115})
+    await hass.async_block_till_done()
+    assert [c.data["temperature"] for c in pit_calls] == [65]
+    freezer.tick(timedelta(minutes=30))
+    _set(hass, 66, p2=316.1, pit=66)
+    await hass.async_block_till_done()
+    advice = hass.states.get("sensor.cook_planner_next_action")
+    assert advice.state == "Keeping warm at 65C for 30 min"
+    _set(hass, 58, p2=316.1, pit=66)  # back below 60C after being warm: alert
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.cook_planner_next_action").state.startswith("Meat at 58C, below 60C")
+    assert advice.attributes["rest_ends"] is None
+    with pytest.raises(Exception, match="end it before planning"):
+        await hass.services.async_call(
+            "button", "press", {"entity_id": "button.cook_planner_generate_plan"}, blocking=True
+        )
+
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.cook_planner_stage").state == "hold"  # survives a restart
+    await _press(hass, "end_cook")
+    assert hass.states.get("sensor.cook_planner_cook_log").state == "0"  # nothing cooked, nothing logged

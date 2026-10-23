@@ -18,7 +18,7 @@ step. Ignition always stays with you.
 |---|---|
 | Chicken | Thigh (bone-in), Thigh fillet, Thigh fillet - quick (hot & fast, 30 min), Breast, Whole (butterflied), Whole, **Spatchcock herb-butter** (recipe 1.1), **Smoked & seared bone-in thighs** (1.2) |
 | Beef brisket | Point end (deckle), Flat, Whole (packer) |
-| Pork | Shoulder (bone-in), **Pulled pork, Boston butt** (2.1), **Spare ribs 3-2-1** (2.2) |
+| Pork | Shoulder (bone-in), **Pulled pork, Boston butt** (2.1), **Spare ribs 3-2-1** (2.2), **Rolled roast with crackling** (2.3), **Rolled shoulder, pulled** (2.4) |
 | Lamb | Shoulder (bone-in), **Rack, reverse-seared** (3.1), **8-hour pulled shoulder** (3.2) |
 | Sausages | **Slow-smoked snags & brats** (4.1) |
 | Vegetables | **Hasselback potatoes** (5.1), **Balsamic veg medley** (5.2) |
@@ -32,6 +32,11 @@ and optional `prompts` (`at_min`, `every_min` + `from_min`, `at_probe_c`). A
 `timer_from_pit` stage starts its clock only once the grill is within 10C of the
 set temperature. Timed recipes (`"probe": false`) need no probe; a probe recipe
 never calls the pull on time alone.
+
+A recipe can also give `time.ref_thickness_cm`. When a Thickness is entered, it
+alone sets the time of the scaled steps, `(t / ref_t) ** 1.5` with the ratio held
+to 0.5-2: a rolled roast cooks by the diameter of the roll, not its length. The
+two rolled pork recipes use it (reference 12 cm); enter the tied roll's diameter.
 
 Every step change and prompt fires a `cook_planner_prompt` event
 (`title`, `message`, `kind`, `key`) for notifications. **Next step** moves a recipe

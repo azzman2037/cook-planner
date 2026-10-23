@@ -57,9 +57,9 @@ class Cook:
         return [e.key for e in self.events]
 
 
-def test_nine_guide_recipes_are_in_the_menu() -> None:
+def test_guide_and_house_recipes_are_in_the_menu() -> None:
     ids = sorted(PROFILES.cut(m, c).recipe for m, c in RECIPES)
-    assert ids == ["1.1", "1.2", "2.1", "2.2", "3.1", "3.2", "4.1", "5.1", "5.2"]
+    assert ids == ["1.1", "1.2", "2.1", "2.2", "2.3", "2.4", "3.1", "3.2", "4.1", "5.1", "5.2"]
     assert PROFILES.meats["sausages"] == "Sausages"
     assert PROFILES.meats["vegetables"] == "Vegetables"
 
@@ -84,10 +84,66 @@ def test_recipe_pits_and_pulls_are_safe(meat: str, cut: str) -> None:
         ("sausages", "smoked_sausages", 1.1, 1.5),
         ("vegetables", "hasselback_potatoes", 1.3, 1.6),
         ("vegetables", "balsamic_veg", 1.0, 1.3),
+        ("pork_shoulder", "rolled_roast_crackle", 4.3, 4.8),  # ~4h35 at 2 kg / 12 cm
+        ("pork_shoulder", "rolled_pulled", 6.2, 6.8),  # ~6h30 at 2 kg / 12 cm
     ],
 )
 def test_planned_time_matches_the_guide(meat: str, cut: str, lo_h: float, hi_h: float) -> None:
     assert lo_h <= _plan(meat, cut).cook_hours <= hi_h
+
+
+def _rolled(cut: str, kg: float = 2.0, cm: float | None = None):
+    prof = PROFILES.cut("pork_shoulder", cut)
+    return build_plan(PROFILES, prof, weight_kg=kg, thickness_cm=cm, serve_by=T0 + timedelta(days=1), now=T0)
+
+
+def test_rolled_roast_time_follows_the_roll_diameter_not_its_length() -> None:
+    base = _rolled("rolled_pulled").cook_hours
+    assert _rolled("rolled_pulled", cm=12).cook_hours == pytest.approx(base)
+    # A longer roll of the same diameter cooks in the same time.
+    assert _rolled("rolled_pulled", kg=3, cm=12).cook_hours == pytest.approx(base)
+    assert _rolled("rolled_pulled", kg=3).cook_hours > base  # no diameter given: weight decides
+    fat, thin = _rolled("rolled_pulled", cm=14), _rolled("rolled_pulled", cm=10)
+    assert fat.cook_hours == pytest.approx(base * (14 / 12) ** 1.5)  # all three steps scale
+    assert thin.cook_hours == pytest.approx(base * (10 / 12) ** 1.5)
+    assert fat.thickness_cm == 14
+    assert "2 kg, 14 cm thick" in fat.summary()
+
+
+def test_diameter_is_clamped_and_ignored_where_it_does_not_apply() -> None:
+    base = _rolled("rolled_pulled").cook_hours
+    assert _rolled("rolled_pulled", cm=3).cook_hours == pytest.approx(base * 0.5**1.5)
+    ribs = _rolled("spare_ribs_321")
+    assert _rolled("spare_ribs_321", cm=20).cook_hours == pytest.approx(ribs.cook_hours)
+    assert _rolled("spare_ribs_321", cm=20).thickness_cm is None
+
+
+def test_crackle_step_is_not_scaled_by_size() -> None:
+    small, big = _rolled("rolled_roast_crackle", cm=9), _rolled("rolled_roast_crackle", cm=15)
+    crackle = lambda p: next(ph for ph in p.phases if ph.key == "crackle")  # noqa: E731
+    assert crackle(small).end - crackle(small).start == crackle(big).end - crackle(big).start == timedelta(minutes=20)
+
+
+def test_rolled_roast_steps_to_crackle_and_pulls_at_90() -> None:
+    c = Cook(_rolled("rolled_roast_crackle", cm=12))
+    st = c.tick(p1=5, pit=118)
+    assert st.pit_c == 120
+    st = c.tick(160, p1=65.2)
+    assert (c.run.index, st.pit_c) == (1, 160)
+    st = c.tick(85, p1=85.4, pit=160)
+    assert (c.run.index, st.pit_c) == (2, 250)
+    assert "oil and salt" in c.events[-1].message
+    c.tick(15, p1=88, pit=245)
+    assert "oven grill" in c.events[-1].message
+    st = c.tick(3, p1=90.3)
+    assert st.ready
+
+
+def test_rolled_recipes_meet_the_rolled_meat_safety_floor() -> None:
+    for cut in ("rolled_roast_crackle", "rolled_pulled"):
+        prof = PROFILES.cut("pork_shoulder", cut)
+        assert prof.safe_min_c == 75
+        assert prof.pull_c >= 88
 
 
 def test_recipe_plan_phases_follow_the_stages() -> None:

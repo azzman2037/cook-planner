@@ -42,6 +42,7 @@ MIN_PACE = 0.5
 MAX_PACE = 2.5
 PACE_MIN_ELAPSED_MIN = 20.0
 RATE_MIN_C_PER_H = 1.0
+PROBE_LOST_MIN = 10
 BEHIND_ACTION_MIN = 20
 AHEAD_ACTION_MIN = 30
 PIT_NUDGE_C = 10
@@ -939,6 +940,7 @@ class RecipeRun:
     last_prompt: str | None = None
     last_prompt_at: datetime | None = None
     ready: bool = False
+    probe_lost_at: datetime | None = None
 
     def as_dict(self) -> dict[str, Any]:
         """Serialise for storage."""
@@ -951,6 +953,7 @@ class RecipeRun:
             "last_prompt": self.last_prompt,
             "last_prompt_at": iso(self.last_prompt_at),
             "ready": self.ready,
+            "probe_lost_at": iso(self.probe_lost_at),
         }
 
     @classmethod
@@ -965,6 +968,7 @@ class RecipeRun:
             last_prompt=d.get("last_prompt"),
             last_prompt_at=parse(d.get("last_prompt_at")),
             ready=bool(d.get("ready", False)),
+            probe_lost_at=parse(d.get("probe_lost_at")),
         )
 
 
@@ -1017,9 +1021,11 @@ def _stage_done(
         return (pit_c is not None and pit_c >= st.until_value) or waited >= max(2 * planned, 30)
     target = st.until_value if st.until == "probe_c" else p.pull_c
     if probe_c is None:
-        # No probe reading: intermediate steps move on by the planned time, but the
-        # pull is never called on time alone - safe doneness needs a temperature.
-        return st.until != "pull" and clock >= planned
+        # No probe reading: hold the step. A probe that drops out for a moment (a loose
+        # plug, a knock) must not skip a step on the planned time - that once moved a
+        # cook to "wrap" at 54C and raised the pit. The cook is alerted instead and can
+        # press Next step.
+        return False
     if probe_c < target:
         return False
     if st.until == "pull" and p.probe_2_target_c and probe2_c is not None:
@@ -1096,6 +1102,21 @@ def recipe_tick(
     if run.entered is None:
         run.entered = now
         emit(_stage_event(plan, 0, None))
+
+    if p.uses_probe and probe_c is None and not run.ready:
+        run.probe_lost_at = run.probe_lost_at or now
+        if (now - run.probe_lost_at).total_seconds() / 60 >= PROBE_LOST_MIN:
+            emit(
+                RecipeEvent(
+                    f"lost@{run.probe_lost_at.isoformat()}",
+                    "prompt",
+                    "Check probe 1",
+                    f"No probe reading for {PROBE_LOST_MIN} min. Check it's plugged into the grill and in the "
+                    "centre of the meat. The recipe holds this step until it reads again, or press Next step.",
+                )
+            )
+    else:
+        run.probe_lost_at = None
 
     for _ in range(len(stages)):
         st = stages[run.index]

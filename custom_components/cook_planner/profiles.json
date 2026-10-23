@@ -493,6 +493,126 @@
               ]
             }
           ]
+        },
+        "rolled_roast_crackle": {
+          "name": "Rolled roast with crackling · recipe",
+          "recipe": "2.3",
+          "pellets": "Apple or cherry",
+          "prep": "Night before: score the skin, salt it and leave the roast uncovered in the fridge to dry. Season the inside, re-roll and tie every 2-3 cm so it's even end to end. Measure across the tied roll and enter it as Thickness - it sets the cook time better than weight.",
+          "pull_c": 90,
+          "safe_min_c": 75,
+          "probe_1_role": "Dead centre of the roll",
+          "rest_min": 25,
+          "rest_note": "Rest uncovered (foil softens the crackling), cut the string and slice 1 cm thick.",
+          "time": {
+            "ref_kg": 2.0,
+            "weight_exponent": 0.67,
+            "ref_thickness_cm": 12
+          },
+          "notes": "Sliced roast pork, pulled at 88-90C. Rolled meat carries the outside surface into the centre, so the centre must reach at least 75C.",
+          "stages": [
+            {
+              "key": "smoke",
+              "name": "Smoke",
+              "icon": "smoke",
+              "pit_c": 120,
+              "until": {
+                "probe_c": 65
+              },
+              "minutes": 165,
+              "enter": "Skin up, probe dead centre of the roll. Keep spritz and rub off the skin."
+            },
+            {
+              "key": "roast",
+              "name": "Roast",
+              "icon": "flame",
+              "pit_c": 160,
+              "until": {
+                "probe_c": 85
+              },
+              "minutes": 90,
+              "enter": "Pit up to 160C to render the fat and soften the collagen."
+            },
+            {
+              "key": "crackle",
+              "name": "Crackle",
+              "icon": "sear",
+              "pit_c": 250,
+              "until": {
+                "pull": true
+              },
+              "minutes": 20,
+              "scale": false,
+              "enter": "Brush the skin with a little oil and salt. Pit to 250C to blister the crackling.",
+              "prompts": [
+                {
+                  "at_min": 15,
+                  "text": "Check the crackling. Not puffing yet? Take the roast off and finish the skin under the oven grill for 3-5 min."
+                }
+              ]
+            }
+          ]
+        },
+        "rolled_pulled": {
+          "name": "Rolled shoulder, pulled · recipe",
+          "recipe": "2.4",
+          "pellets": "Apple, cherry or GMG Texas Blend",
+          "prep": "Take the skin off (keep it for crackling). Rub all over, including the inside, re-roll and tie every 2-3 cm. Measure across the tied roll and enter it as Thickness - it sets the cook time better than weight.",
+          "pull_c": 95,
+          "safe_min_c": 75,
+          "probe_1_role": "Dead centre of the roll",
+          "rest_min": 60,
+          "rest_note": "Wrap in a towel and rest 1 h in an esky (keep it above 60C), then pull and mix through the juices. Optional: crisp the salted skin on the grill at 250C for 25-30 min while it rests.",
+          "time": {
+            "ref_kg": 2.0,
+            "weight_exponent": 0.67,
+            "ref_thickness_cm": 12
+          },
+          "stall_c": [65, 74],
+          "notes": "Pull at 95-96C when probe-tender. Start early if you can: the esky holds it hot for 2-3 h.",
+          "stages": [
+            {
+              "key": "bark",
+              "name": "Bark",
+              "icon": "smoke",
+              "pit_c": 110,
+              "until": {
+                "probe_c": 72
+              },
+              "minutes": 225,
+              "enter": "Probe dead centre of the roll.",
+              "prompts": [
+                {
+                  "every_min": 45,
+                  "from_min": 120,
+                  "text": "Spritz with 50/50 apple juice and cider vinegar."
+                }
+              ]
+            },
+            {
+              "key": "wrap",
+              "name": "Wrap",
+              "icon": "wrap",
+              "pit_c": 125,
+              "until": {
+                "probe_c": 93
+              },
+              "minutes": 135,
+              "enter": "Wrap tight in butcher paper or foil with a splash of apple juice, re-seat the probe. Pit to 125C.",
+              "wrap": true
+            },
+            {
+              "key": "tender",
+              "name": "Probe-tender check",
+              "icon": "probe",
+              "pit_c": 125,
+              "until": {
+                "pull": true
+              },
+              "minutes": 30,
+              "enter": "Start probe-tender checks: it should slide in like warm butter."
+            }
+          ]
         }
       }
     },

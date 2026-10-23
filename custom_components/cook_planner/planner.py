@@ -11,6 +11,11 @@ Model
   the cook of a 3 kg one. When a thickness is supplied and the profile has a
   reference thickness, a thickness estimate ``(t / ref_t) ** 1.5`` is averaged
   in.
+* Staged recipes scale their probe-driven steps by weight the same way, unless
+  the recipe has a ``ref_thickness_cm`` and a thickness is entered: then the
+  thickness alone sets the scale (``(t / ref_t) ** 1.5``, ratio held to 0.5-2).
+  That suits rolled roasts, whose cook depends on the roll's diameter, not on
+  how long the roll is.
 * ``curve`` is the planned probe temperature against fraction of the unwrapped
   cook. Wrapping compresses everything after the wrap point by the wrap
   method's ``post_wrap_time_factor``.
@@ -371,7 +376,8 @@ class Plan:
         h, m = int(hrs), round((hrs - int(hrs)) * 60)
         if m == 60:
             h, m = h + 1, 0
-        return f"{self.profile.label} {self.weight_kg:g} kg - {h}h{m:02d} cook"
+        size = f"{self.weight_kg:g} kg" + (f", {self.thickness_cm:g} cm thick" if self.thickness_cm else "")
+        return f"{self.profile.label} {size} - {h}h{m:02d} cook"
 
     def as_dict(self) -> dict[str, Any]:
         """Serialise for storage / attributes."""
@@ -427,7 +433,9 @@ def build_plan(
 ) -> Plan:
     """Build a schedule working backwards from ``serve_by``."""
     if profile.is_recipe:
-        return _build_recipe_plan(profiles, profile, weight_kg=weight_kg, serve_by=serve_by, now=now)
+        return _build_recipe_plan(
+            profiles, profile, weight_kg=weight_kg, serve_by=serve_by, now=now, thickness_cm=thickness_cm
+        )
     wrap_key = wrap or profile.wrap_default
     if wrap_key not in profiles.wrap_methods:
         raise ValueError(f"unknown wrap method {wrap_key}")
@@ -784,7 +792,7 @@ def _parse_recipe(meat_key: str, meat_name: str, cut_key: str, c: dict[str, Any]
         ref_kg=float(time.get("ref_kg", 1.0)),
         ref_hours=sum(st.minutes for st in stages) / 60,
         weight_exponent=float(time.get("weight_exponent", 0.67)),
-        ref_thickness_cm=None,
+        ref_thickness_cm=_opt_float(time.get("ref_thickness_cm")),
         curve=curve,
         stall_c=(float(c["stall_c"][0]), float(c["stall_c"][1])) if c.get("stall_c") else None,
         notes=c.get("notes", ""),
@@ -811,11 +819,21 @@ def _recipe_curve(stages: list[RecipeStage], pull_c: float) -> tuple[tuple[float
     return tuple(points)
 
 
-def recipe_stage_minutes(profile: CutProfile, weight_kg: float) -> tuple[float, ...]:
-    """Planned minutes for each stage at this weight (heat-up allowance included)."""
+def recipe_scale(profile: CutProfile, weight_kg: float, thickness_cm: float | None = None) -> float:
+    """Time factor for a recipe's scaled steps: thickness when the recipe supports it, else weight."""
     if weight_kg <= 0:
         raise ValueError("weight must be positive")
-    factor = (weight_kg / profile.ref_kg) ** profile.weight_exponent
+    if thickness_cm and profile.ref_thickness_cm:
+        ratio = min(2.0, max(0.5, thickness_cm / profile.ref_thickness_cm))
+        return ratio**THICKNESS_EXPONENT
+    return (weight_kg / profile.ref_kg) ** profile.weight_exponent
+
+
+def recipe_stage_minutes(
+    profile: CutProfile, weight_kg: float, thickness_cm: float | None = None
+) -> tuple[float, ...]:
+    """Planned minutes for each stage at this size (heat-up allowance included)."""
+    factor = recipe_scale(profile, weight_kg, thickness_cm)
     return tuple(
         st.minutes * (factor if st.scale else 1.0) + (HEAT_UP_EST_MIN if st.timer_from_pit else 0.0)
         for st in profile.stages
@@ -835,9 +853,16 @@ def _until_text(st: RecipeStage, p: CutProfile) -> str:
 
 
 def _build_recipe_plan(
-    profiles: Profiles, profile: CutProfile, *, weight_kg: float, serve_by: datetime, now: datetime
+    profiles: Profiles,
+    profile: CutProfile,
+    *,
+    weight_kg: float,
+    serve_by: datetime,
+    now: datetime,
+    thickness_cm: float | None = None,
 ) -> Plan:
-    stage_min = recipe_stage_minutes(profile, weight_kg)
+    used_thickness = thickness_cm if thickness_cm and profile.ref_thickness_cm else None
+    stage_min = recipe_stage_minutes(profile, weight_kg, used_thickness)
     cook_min = sum(stage_min)
     preheat = timedelta(minutes=profiles.preheat_min)
     rest = timedelta(minutes=profile.rest_min)
@@ -885,7 +910,7 @@ def _build_recipe_plan(
     return Plan(
         profile=profile,
         weight_kg=weight_kg,
-        thickness_cm=None,
+        thickness_cm=used_thickness,
         wrap="none",
         serve_by=serve_by,
         created=now,

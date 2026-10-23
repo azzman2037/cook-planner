@@ -23,7 +23,17 @@ STAGE_PLANNED: Final = "planned"
 STAGE_PREHEAT: Final = "preheat"
 STAGE_COOKING: Final = "cooking"
 STAGE_REST: Final = "rest"
-STAGES: Final = [STAGE_IDLE, STAGE_PLANNED, STAGE_PREHEAT, STAGE_COOKING, STAGE_REST]
+# Keeping warm in the smoker: after a cook (the rest happens on the grill) or on its own.
+STAGE_HOLD: Final = "hold"
+STAGES: Final = [STAGE_IDLE, STAGE_PLANNED, STAGE_PREHEAT, STAGE_COOKING, STAGE_REST, STAGE_HOLD]
+
+# Keep-warm setpoint. 65C is the lowest the GMG holds (150F); 70C gives a steady margin.
+KEEP_WARM_DEFAULT_C: Final = 70.0
+KEEP_WARM_MIN_C: Final = 65.0
+KEEP_WARM_MAX_C: Final = 95.0
+# Hot-holding: meat below 60C gets an alert, re-armed once it is back to 62C.
+HOLD_SAFE_C: Final = 60.0
+HOLD_REARM_C: Final = 62.0
 
 EVENT_PROMPT: Final = "cook_planner_prompt"
 # Legacy (non-recipe) advice that warrants a phone notification, keyed by prefix.

@@ -55,6 +55,10 @@ def _advice_attrs(m: CookManager) -> Mapping[str, Any]:
         "steps": m.steps,
         "step_remaining_min": round(m.step_remaining_min) if m.step_remaining_min is not None else None,
         "auto_pit": m.auto_pit,
+        "keep_warm_c": m.keep_warm_c,
+        "hold_since": m.hold_since.isoformat() if m.hold_since else None,
+        "pulled_at": m.pulled_at.isoformat() if m.pulled_at else None,
+        "rest_ends": m.rest_ends.isoformat() if m.rest_ends and m.stage in ("rest", "hold") else None,
     }
 
 

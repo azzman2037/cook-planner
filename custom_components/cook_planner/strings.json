@@ -51,6 +51,9 @@
       },
       "thickness": {
         "name": "Thickness"
+      },
+      "keep_warm": {
+        "name": "Keep warm"
       }
     },
     "datetime": {
@@ -79,6 +82,9 @@
       },
       "next_step": {
         "name": "Next step"
+      },
+      "keep_warm": {
+        "name": "Keep warm"
       }
     },
     "sensor": {
@@ -89,7 +95,8 @@
           "planned": "Planned",
           "preheat": "Preheating",
           "cooking": "Cooking",
-          "rest": "Resting"
+          "rest": "Resting",
+          "hold": "Keeping warm"
         }
       },
       "plan": {

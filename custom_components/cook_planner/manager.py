@@ -22,6 +22,11 @@ from .const import (
     CONF_PROBE_2,
     DOMAIN,
     EVENT_PROMPT,
+    HOLD_REARM_C,
+    HOLD_SAFE_C,
+    KEEP_WARM_DEFAULT_C,
+    KEEP_WARM_MAX_C,
+    KEEP_WARM_MIN_C,
     LOG_KEEP,
     LOGGER,
     NOTIFY_PREFIXES,
@@ -29,6 +34,7 @@ from .const import (
     RATE_WINDOW_MIN,
     SAMPLE_KEEP_MIN,
     STAGE_COOKING,
+    STAGE_HOLD,
     STAGE_IDLE,
     STAGE_PLANNED,
     STAGE_PREHEAT,
@@ -102,6 +108,7 @@ class CookManager:
         self.thickness_cm: float = 0.0
         self.wrap: str = ""
         self.serve_by: datetime = dt_util.now()
+        self.keep_warm_c: float = KEEP_WARM_DEFAULT_C
         # Session
         self.stage: str = STAGE_IDLE
         self.plan: Plan | None = None
@@ -110,6 +117,12 @@ class CookManager:
         self.meat_on: datetime | None = None
         self.wrapped_at: datetime | None = None
         self.pulled_at: datetime | None = None
+        self.hold_since: datetime | None = None
+        self.rest_done: bool = False  # "rest done" sent for this hold
+        # Meat-cooling alert: armed once the meat is at 62C+, sent once per drop below 60C.
+        # Meat warming up from cold in a stand-alone hold never arms it.
+        self.hold_armed: bool = False
+        self.hold_peak_c: float | None = None
         self.log: list[dict[str, Any]] = []
         # Derived each refresh
         self.probe_1_c: float | None = None
@@ -221,6 +234,8 @@ class CookManager:
         """Set weight_kg, thickness_cm, wrap or serve_by."""
         if name == "wrap" and value not in self.profiles.wrap_methods:
             raise HomeAssistantError(f"Unknown wrap method {value}")
+        if name == "keep_warm_c":
+            value = min(max(float(value), KEEP_WARM_MIN_C), KEEP_WARM_MAX_C)
         setattr(self, name, value)
         self._input_changed()
 
@@ -237,7 +252,7 @@ class CookManager:
     @callback
     def generate_plan(self) -> None:
         """Build a plan from the current inputs."""
-        if self.stage in (STAGE_PREHEAT, STAGE_COOKING, STAGE_REST):
+        if self.stage in (STAGE_PREHEAT, STAGE_COOKING, STAGE_REST, STAGE_HOLD):
             raise HomeAssistantError("A cook is in progress: end it before planning a new one")
         self._roll_stale_serve_by()
         self._build_plan()
@@ -342,6 +357,37 @@ class CookManager:
         self._refresh()
 
     @callback
+    def keep_warm(self) -> None:
+        """Hold the smoker at the keep-warm temperature and keep watching the probes.
+
+        From cooking this is "pull and rest in the smoker"; from resting it moves the
+        rest onto the grill; from idle or planned it is a keep-warm session on its own
+        (e.g. after End cook shut the grill down). Ignition stays with the cook.
+        """
+        if self.stage == STAGE_HOLD:
+            return
+        now = dt_util.now()
+        if self.stage == STAGE_COOKING:
+            self.pulled_at = now
+        elif self.stage != STAGE_REST:
+            self.pulled_at = None  # a stand-alone hold: no rest timer
+        self.stage = STAGE_HOLD
+        self.hold_since = now
+        self.rest_done = False
+        self.hold_armed = False
+        self.hold_peak_c = None
+        self._last_auto_pit = None
+        self._save()
+        self._refresh()
+
+    @property
+    def rest_ends(self) -> datetime | None:
+        """When the planned rest finishes, for a hold that follows a cook."""
+        if self.plan is None or self.pulled_at is None or not self.plan.profile.rest_min:
+            return None
+        return self.pulled_at + timedelta(minutes=self.plan.profile.rest_min)
+
+    @callback
     def end(self) -> None:
         """Finish (or abandon) the cook and write it to the log."""
         if self.plan is not None and self.meat_on is not None:
@@ -351,6 +397,9 @@ class CookManager:
         self.plan = None
         self.plan_inputs = None
         self.started_at = self.meat_on = self.wrapped_at = self.pulled_at = None
+        self.hold_since = None
+        self.rest_done = self.hold_armed = False
+        self.hold_peak_c = None
         self.run = None
         self._samples.clear()
         self._save()
@@ -371,6 +420,10 @@ class CookManager:
             "wrapped_at": self.wrapped_at.isoformat() if self.wrapped_at else None,
             "pulled_at": self.pulled_at.isoformat() if self.pulled_at else None,
             "pulled": self.pulled_at is not None,
+            "held_in_smoker_min": (
+                round((dt_util.now() - self.hold_since).total_seconds() / 60) if self.hold_since else None
+            ),
+            "keep_warm_c": self.keep_warm_c if self.hold_since else None,
             "final_probe_1_c": self.probe_1_c,
             "recipe": self.plan.profile.recipe if self.plan.profile.is_recipe else None,
             "step_reached": self.run.index + 1 if self.run else None,
@@ -402,7 +455,9 @@ class CookManager:
         self.advice_title = self.advice_icon = None
         self.step = self.steps = self.step_remaining_min = None
         events: list[RecipeEvent] = []
-        if plan is None:
+        if self.stage == STAGE_HOLD:
+            self._hold_tick(now, events)
+        elif plan is None:
             self.advice = "Choose a meat, cut, weight and serve time, then Generate plan"
             self.recommended_pit_c = None
         elif self.stage == STAGE_COOKING and self.run is not None and self.meat_on is not None:
@@ -439,11 +494,75 @@ class CookManager:
                 elapsed_min=elapsed,
             )
         self._notify_events(events)
-        if plan is not None:
+        if self.stage == STAGE_HOLD:
+            # Asked for explicitly, so it applies whatever the auto-pit switch says.
+            self._apply_auto_pit(self.keep_warm_c, force=True)
+        elif plan is not None:
             self._apply_auto_pit(
                 planned_pit(plan, stage=self.stage, probe_c=self.probe_1_c, elapsed_min=elapsed, run=self.run)
             )
         self._notify()
+
+    def _hold_tick(self, now: datetime, events: list[RecipeEvent]) -> None:
+        """Advice and alerts while keeping warm."""
+        kw = self.keep_warm_c
+        self.recommended_pit_c = kw
+        self.advice_title, self.advice_icon = "Keeping warm", "hold"
+        meats = [t for t in (self.probe_1_c, self.probe_2_c) if t is not None]
+        coolest = min(meats) if meats else None
+        if coolest is not None and (self.hold_peak_c is None or coolest > self.hold_peak_c):
+            self.hold_peak_c = coolest
+        if coolest is not None and coolest >= HOLD_REARM_C and not self.hold_armed:
+            self.hold_armed = True
+            self._save()
+        elif coolest is not None and coolest < HOLD_SAFE_C and self.hold_armed:
+            self.hold_armed = False
+            self._save()
+            events.append(
+                RecipeEvent(
+                    f"cold@{now.isoformat()}",
+                    "prompt",
+                    "Meat cooling",
+                    f"Probe at {coolest:.0f}C, below {HOLD_SAFE_C:g}C. Serve now, or raise keep warm"
+                    + (" and check the grill is lit." if not self._grill_heating() else "."),
+                )
+            )
+        ends = self.rest_ends
+        if ends is not None:
+            left = (ends - now).total_seconds() / 60
+            self.step_remaining_min = max(left, 0)
+            if left <= 0 and not self.rest_done:
+                self.rest_done = True
+                self._save()
+                events.append(
+                    RecipeEvent(
+                        "rest_done",
+                        "ready",
+                        "Rest done",
+                        f"Ready to serve. Still holding at {kw:g}C"
+                        + (f", meat {coolest:.0f}C." if coolest is not None else "."),
+                    )
+                )
+        if not self._grill_heating():
+            self.advice = f"Grill is off: tap Ignite and it will hold {kw:g}C"
+        elif ends is not None and now < ends:
+            self.advice = f"Resting in the smoker at {kw:g}C, {(ends - now).total_seconds() / 60:.0f} min to go"
+        elif ends is not None:
+            self.advice = f"Rest done: ready to serve. Holding {kw:g}C"
+        else:
+            held = (now - self.hold_since).total_seconds() / 60 if self.hold_since else 0
+            self.advice = f"Keeping warm at {kw:g}C for {held:.0f} min"
+        if coolest is not None and coolest < HOLD_SAFE_C:
+            if (self.hold_peak_c or 0) >= HOLD_REARM_C:
+                self.advice = f"Meat at {coolest:.0f}C, below {HOLD_SAFE_C:g}C: serve now. " + self.advice
+            else:
+                self.advice += f", meat {coolest:.0f}C and warming"
+
+    def _grill_heating(self) -> bool:
+        if not self.pit_entity or not self.pit_entity.startswith("climate."):
+            return True  # a plain sensor: assume the cook runs the heat
+        state = self.hass.states.get(self.pit_entity)
+        return state is not None and state.state == "heat"
 
     def _notify_events(self, events: list[RecipeEvent]) -> None:
         """Fire cook_planner_prompt for recipe events and for legacy advice changes."""
@@ -452,7 +571,8 @@ class CookManager:
                 EVENT_PROMPT, {"key": ev.key, "kind": ev.kind, "title": ev.title, "message": ev.message}
             )
         recipe_cooking = self.run is not None and self.stage == STAGE_COOKING
-        key = self.advice[:8] if self.advice[:8] in NOTIFY_PREFIXES and not recipe_cooking else None
+        legacy = not recipe_cooking and self.stage != STAGE_HOLD
+        key = self.advice[:8] if self.advice[:8] in NOTIFY_PREFIXES and legacy else None
         if self._primed and key and key != self._last_notify_key:
             self.hass.bus.async_fire(
                 EVENT_PROMPT, {"key": key, "kind": "advice", "title": NOTIFY_PREFIXES[key], "message": self.advice}
@@ -460,13 +580,13 @@ class CookManager:
         self._last_notify_key = key
         self._primed = True
 
-    def _apply_auto_pit(self, target: float | None) -> None:
+    def _apply_auto_pit(self, target: float | None, force: bool = False) -> None:
         """Set the grill to the planned pit temperature when the plan's step changes it.
 
         Only acts on a change of plan target, so a manual tweak sticks until the
         next step; never powers the grill on (ignition stays with the cook).
         """
-        if not self.auto_pit or target is None or target == self._last_auto_pit:
+        if not (self.auto_pit or force) or target is None or target == self._last_auto_pit:
             return
         if not self.pit_entity or not self.pit_entity.startswith("climate."):
             return
@@ -520,6 +640,7 @@ class CookManager:
                 "wrap": self.wrap,
                 "serve_by": self.serve_by.isoformat(),
                 "auto_pit": self.auto_pit,
+                "keep_warm_c": self.keep_warm_c,
             },
             "session": {
                 "stage": self.stage,
@@ -529,6 +650,10 @@ class CookManager:
                 "meat_on": iso(self.meat_on),
                 "wrapped_at": iso(self.wrapped_at),
                 "pulled_at": iso(self.pulled_at),
+                "hold_since": iso(self.hold_since),
+                "rest_done": self.rest_done,
+                "hold_armed": self.hold_armed,
+                "hold_peak_c": self.hold_peak_c,
                 "recipe_run": self.run.as_dict() if self.run else None,
                 "auto_pit_last": self._last_auto_pit,
             },
@@ -555,6 +680,7 @@ class CookManager:
             self.serve_by = serve
         self.log = list(data.get("log", []))
         self.auto_pit = bool(inputs.get("auto_pit", True))
+        self.keep_warm_c = float(inputs.get("keep_warm_c") or KEEP_WARM_DEFAULT_C)
 
         session = data.get("session") or {}
         try:
@@ -563,7 +689,12 @@ class CookManager:
                 self.plan_inputs = session["plan_inputs"]
                 self.plan = self._plan_from_inputs(self.plan_inputs, created)
                 self.stage = session.get("stage", STAGE_PLANNED)
-            for key in ("started_at", "meat_on", "wrapped_at", "pulled_at"):
+            elif session.get("stage") == STAGE_HOLD:
+                self.stage = STAGE_HOLD  # a stand-alone keep-warm has no plan
+            self.rest_done = bool(session.get("rest_done"))
+            self.hold_armed = bool(session.get("hold_armed"))
+            self.hold_peak_c = session.get("hold_peak_c")
+            for key in ("started_at", "meat_on", "wrapped_at", "pulled_at", "hold_since"):
                 setattr(self, key, dt_util.parse_datetime(session.get(key) or ""))
             self._last_auto_pit = session.get("auto_pit_last")
             if session.get("recipe_run") and self.plan is not None and self.plan.profile.is_recipe:

@@ -29,6 +29,7 @@ BUTTONS: tuple[CookButtonDescription, ...] = (
     CookButtonDescription(key="wrapped", icon="mdi:package-variant-closed", press_fn=lambda m: m.mark_wrapped()),
     CookButtonDescription(key="next_step", icon="mdi:skip-next", press_fn=lambda m: m.next_step()),
     CookButtonDescription(key="pulled", icon="mdi:timer-sand", press_fn=lambda m: m.mark_pulled()),
+    CookButtonDescription(key="keep_warm", icon="mdi:heat-wave", press_fn=lambda m: m.keep_warm()),
     CookButtonDescription(key="end", icon="mdi:flag-checkered", press_fn=lambda m: m.end()),
 )
 

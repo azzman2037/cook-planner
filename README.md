@@ -43,6 +43,10 @@ rate of rise is measurable: Newton's law of heating, `k = rate / (pit - probe)`,
 `t = ln((pit - probe) / (pit - target)) / k`, so it slows as the meat nears the pit.
 Stalls are not modelled; the advice says "plus any stall" when one is ahead.
 
+If probe 1 stops reading, a probe-driven step is held, never moved on by the clock
+(a momentary dropout once skipped a cook to "wrap" at 54C). After 10 minutes without
+a reading the cook gets a "Check probe 1" alert; Next step still works by hand.
+
 Every step change and prompt fires a `cook_planner_prompt` event
 (`title`, `message`, `kind`, `key`) for notifications. **Next step** moves a recipe
 on by hand. With **Auto pit temperature** on, each step's pit is sent to the

@@ -68,6 +68,20 @@ the grill is already heating; ignition stays with the cook. Once the meat has be
 at 62 °C or more, a drop below 60 °C sends a "Meat cooling" alert (once per drop).
 End cook logs the time held in the smoker.
 
+**After keep warm** picks how it ends: shut down when the rest ends (default), at
+a set time (**Keep warm until**), or keep holding until you serve. Every ending
+shuts the grill down, and no keep-warm runs past 4 hours.
+
+### Checked shutdown (v0.4)
+**Shut down** ends anything in progress (saving the cook) and powers the grill off.
+The GMG firmware then stops the auger and runs its fan for about 6 minutes to burn
+out and clear the firepot. There is no "fan only" command, so the planner cannot
+run that purge itself; `sensor.cook_planner_shutdown` watches every power-off
+(Home Assistant, the app or the grill's button) and reports `cooling` and
+`complete`, or `incomplete` with a "Shutdown incomplete" alert if the grill stops
+without its cool-down while the pit is above 65 °C. Each shutdown is recorded in
+the sensor's `history` attribute (pit temperature, cool-down seen, minutes).
+
 ### Model
 * Cook time = `ref_hours × (weight / ref_kg) ^ weight_exponent` (exponent < 1:
   thickness, not mass, drives low-and-slow time). An optional thickness is
@@ -78,7 +92,7 @@ End cook logs the time held in the smoker.
 
 ## Entities
 Inputs: `select` meat / cut / wrap, `number` weight / thickness / keep warm, `datetime` serve by.
-Buttons: Generate plan, Start cook, Meat on, Wrapped, Next step, Pulled, Keep warm, End cook.
+Buttons: Generate plan, Start cook, Meat on, Wrapped, Next step, Pulled, Keep warm, Shut down, End cook.
 Sensors: stage, plan (phases + planned curve in attributes), next action,
 start by, planned pull, ETA (with low/high), behind schedule, progress,
 recommended pit, planned probe, probe rate, cook log.

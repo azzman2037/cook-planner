@@ -300,6 +300,10 @@ async def test_keep_warm_after_a_cook_rests_in_the_smoker(hass: HomeAssistant, f
     tz = dt_util.get_time_zone("Australia/Sydney")
     freezer.move_to(dt_util.as_utc(dt_util.now(tz).replace(year=2026, month=10, day=17, hour=15, minute=0)))
     await _setup(hass)
+    await hass.services.async_call(
+        "select", "select_option",
+        {"entity_id": "select.cook_planner_after_keep_warm", "option": "Keep holding until I serve"}, blocking=True,
+    )
     events = async_capture_events(hass, "cook_planner_prompt")
     pit_calls = hass.data["pit_calls"]
     await _select(hass, "Chicken", "Spatchcock herb-butter · recipe")
@@ -396,3 +400,122 @@ async def test_keep_warm_on_its_own_waits_for_ignition(hass: HomeAssistant, free
     assert hass.states.get("sensor.cook_planner_stage").state == "hold"  # survives a restart
     await _press(hass, "end_cook")
     assert hass.states.get("sensor.cook_planner_cook_log").state == "0"  # nothing cooked, nothing logged
+
+
+def _pit(hass: HomeAssistant, mode: str, action: str, pit: float) -> None:
+    hass.states.async_set(PIT, mode, {"current_temperature": pit, "temperature": 70, "hvac_action": action})
+
+
+async def test_shut_down_button_checks_for_the_fan_cool_down(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    await _setup(hass)
+    off_calls = async_mock_service(hass, "climate", "turn_off")
+    events = async_capture_events(hass, "cook_planner_prompt")
+    _pit(hass, "heat", "heating", 200)
+    await hass.async_block_till_done()
+    await _press(hass, "shut_down")
+    await hass.async_block_till_done()
+    assert [c.data["entity_id"] for c in off_calls] == [PIT]
+
+    _pit(hass, "off", "off", 199)
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.cook_planner_shutdown").state == "stopping"
+    freezer.tick(timedelta(seconds=30))
+    _pit(hass, "off", "fan", 198)
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.cook_planner_shutdown").state == "cooling"
+    freezer.tick(timedelta(minutes=6))
+    _pit(hass, "off", "off", 120)
+    await hass.async_block_till_done()
+    assert hass.states.get("sensor.cook_planner_shutdown").state == "complete"
+    assert [e.data["title"] for e in events] == ["Cool-down running", "Shutdown complete"]
+    hist = hass.states.get("sensor.cook_planner_shutdown").attributes["history"]
+    assert hist[-1]["fan_cool_down"] is True
+
+
+async def test_any_power_off_without_cool_down_alerts(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    # Off from the app or the grill's button is watched the same way.
+    await _setup(hass)
+    events = async_capture_events(hass, "cook_planner_prompt")
+    _pit(hass, "heat", "heating", 123)
+    await hass.async_block_till_done()
+    _pit(hass, "off", "off", 117)
+    await hass.async_block_till_done()
+    for _ in range(4):
+        freezer.tick(timedelta(seconds=30))
+        async_fire_time_changed(hass)
+        _pit(hass, "off", "off", 116)
+        await hass.async_block_till_done()
+    assert hass.states.get("sensor.cook_planner_shutdown").state == "incomplete"
+    assert [e.data["title"] for e in events].count("Shutdown incomplete") == 1
+
+
+async def test_keep_warm_shuts_down_when_the_rest_ends(hass: HomeAssistant, freezer: FrozenDateTimeFactory) -> None:
+    tz = dt_util.get_time_zone("Australia/Sydney")
+    freezer.move_to(dt_util.as_utc(dt_util.now(tz).replace(year=2026, month=10, day=17, hour=15, minute=0)))
+    await _setup(hass)
+    off_calls = async_mock_service(hass, "climate", "turn_off")
+    events = async_capture_events(hass, "cook_planner_prompt")
+    assert hass.states.get("select.cook_planner_after_keep_warm").state == "Shut down when the rest ends"
+    await _select(hass, "Chicken", "Spatchcock herb-butter · recipe")
+    await _press(hass, "generate_plan")
+    await _press(hass, "start_cook")
+    await _press(hass, "meat_on")
+    freezer.tick(timedelta(minutes=60))
+    _set(hass, 75, p2=81, pit=190)
+    await _press(hass, "keep_warm")
+    assert hass.states.get("sensor.cook_planner_next_action").state.endswith(", then shuts down")
+    freezer.tick(timedelta(minutes=13))
+    _set(hass, 72, p2=74, pit=70)
+    await hass.async_block_till_done()
+    await hass.async_block_till_done()
+    rest = next(e for e in events if e.data["title"] == "Rest done")
+    assert rest.data["message"].endswith("Shutting the grill down now.")
+    assert hass.states.get("sensor.cook_planner_stage").state == "idle"
+    assert len(off_calls) == 1
+    cook = hass.states.get("sensor.cook_planner_cook_log").attributes["cooks"][-1]
+    assert cook["held_in_smoker_min"] == 13
+
+
+async def test_keep_warm_until_a_set_time_and_the_safety_cap(
+    hass: HomeAssistant, freezer: FrozenDateTimeFactory
+) -> None:
+    tz = dt_util.get_time_zone("Australia/Sydney")
+    freezer.move_to(dt_util.as_utc(dt_util.now(tz).replace(year=2026, month=10, day=17, hour=11, minute=0)))
+    await _setup(hass)
+    off_calls = async_mock_service(hass, "climate", "turn_off")
+    events = async_capture_events(hass, "cook_planner_prompt")
+    await hass.services.async_call(
+        "select", "select_option",
+        {"entity_id": "select.cook_planner_after_keep_warm", "option": "Shut down at a set time"}, blocking=True,
+    )
+    until = dt_util.now(tz).replace(hour=12, minute=30)
+    await hass.services.async_call(
+        "datetime", "set_value", {"entity_id": "datetime.cook_planner_keep_warm_until", "datetime": until},
+        blocking=True,
+    )
+    _set(hass, 90, pit=70)
+    await _press(hass, "keep_warm")
+    assert "Shuts down at 12:30" in hass.states.get("sensor.cook_planner_next_action").state
+    freezer.tick(timedelta(minutes=91))
+    _set(hass, 88, pit=70)
+    await hass.async_block_till_done()
+    await hass.async_block_till_done()
+    assert [e.data["title"] for e in events][-1] == "Keep warm finished"
+    assert hass.states.get("sensor.cook_planner_stage").state == "idle"
+    assert len(off_calls) == 1
+
+    # "Until I serve" still stops at the cap.
+    await hass.services.async_call(
+        "select", "select_option",
+        {"entity_id": "select.cook_planner_after_keep_warm", "option": "Keep holding until I serve"}, blocking=True,
+    )
+    await _press(hass, "keep_warm")
+    freezer.tick(timedelta(hours=4, minutes=1))
+    _set(hass, 80, pit=70)
+    await hass.async_block_till_done()
+    await hass.async_block_till_done()
+    assert [e.data["title"] for e in events][-1] == "Keep warm limit reached"
+    assert hass.states.get("sensor.cook_planner_stage").state == "idle"
+    assert len(off_calls) == 2

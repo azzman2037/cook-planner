@@ -38,6 +38,11 @@ alone sets the time of the scaled steps, `(t / ref_t) ** 1.5` with the ratio hel
 to 0.5-2: a rolled roast cooks by the diameter of the roll, not its length. The
 two rolled pork recipes use it (reference 12 cm); enter the tied roll's diameter.
 
+During a cook, a probe-driven step's time left comes from the live probe once its
+rate of rise is measurable: Newton's law of heating, `k = rate / (pit - probe)`,
+`t = ln((pit - probe) / (pit - target)) / k`, so it slows as the meat nears the pit.
+Stalls are not modelled; the advice says "plus any stall" when one is ahead.
+
 Every step change and prompt fires a `cook_planner_prompt` event
 (`title`, `message`, `kind`, `key`) for notifications. **Next step** moves a recipe
 on by hand. With **Auto pit temperature** on, each step's pit is sent to the
